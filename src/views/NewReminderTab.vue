@@ -59,7 +59,16 @@ function resetForm(): void {
 }
 
 async function schedule(): Promise<void> {
-  await NotificationManager.schedule(dateTime.value, form.details);
+  try {
+    await NotificationManager.schedule(dateTime.value, form.details);
+  } catch (err) {
+    console.error('Failed to schedule reminder', err);
+    Toaster.show('Failed to Schedule Reminder', {
+      icon: 'fa-solid fa-circle-exclamation',
+      iconColor: '#f44336',
+    });
+    return;
+  }
   resetForm();
   Toaster.show('Reminder Scheduled', {
     icon: 'fa-solid fa-circle-check',

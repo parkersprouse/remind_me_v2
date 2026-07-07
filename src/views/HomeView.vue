@@ -43,10 +43,21 @@ function onPointerUp(event: PointerEvent): void {
   if (dx < 0 && router.homeTab === 0) router.setTab(1);
   else if (dx > 0 && router.homeTab === 1) router.setTab(0);
 }
+
+// The webview cancels the pointer stream when it claims the gesture for
+// native scrolling; abandon the swipe rather than acting on a stale start.
+function onPointerCancel(): void {
+  tracking = false;
+}
 </script>
 
 <template>
-  <div class="home" @pointerdown="onPointerDown" @pointerup="onPointerUp">
+  <div
+    class="home"
+    @pointerdown="onPointerDown"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerCancel"
+  >
     <Transition :name="slideDirection">
       <KeepAlive>
         <component :is="tabComponents[router.homeTab]" :key="router.homeTab" class="tab-page" />
@@ -64,5 +75,9 @@ function onPointerUp(event: PointerEvent): void {
 .home {
   position: relative;
   overflow: hidden;
+  /* Keep horizontal drags in the pointer-event stream (the Android webview
+     would otherwise claim them and fire pointercancel before pointerup),
+     while still allowing native vertical scrolling of the reminder list. */
+  touch-action: pan-y;
 }
 </style>

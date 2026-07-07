@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
+import { registerAndroidBackHandler } from './lib/androidBack';
 import { NotificationManager } from './lib/notifications';
 import { useSettingsStore } from './stores/settings';
 import '@fortawesome/fontawesome-free/css/all.min.css';
@@ -14,6 +15,9 @@ import '@saurl/tauri-plugin-safe-area-insets-css-api';
 const app = createApp(App);
 app.use(createPinia());
 app.mount('#app');
+
+// Needs the active Pinia set up by app.use() above.
+registerAndroidBackHandler();
 
 void (async () => {
   await useSettingsStore().load();

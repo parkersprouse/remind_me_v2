@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import {
   isPermissionGranted,
   requestPermission,
@@ -79,20 +80,34 @@ export const NotificationManager = {
   async schedule(dateTime: Date, details: string, zone?: string): Promise<void> {
     const id = randomId();
 
-    if (isMobile) {
-      await sendNotification({
-        id,
-        title: NOTIFICATION_TITLE,
-        body: details,
-        largeBody: details,
-        schedule: Schedule.at(dateTime),
-        actionTypeId: (await registerSnoozeActions()) ?? undefined,
-      });
-    } else {
-      armTimer(id, details, dateTime.getTime());
+    // All-or-nothing: insert the row first, arm the notification second, and
+    // roll the row back if arming fails — either both survive or neither does.
+    await DB.insert(id, details, dateTime.getTime(), zone);
+
+    try {
+      if (isMobile) {
+        // Invoked directly rather than through sendNotification(): the
+        // window.Notification shim it wraps is fire-and-forget, so backend
+        // failures would be silently swallowed.
+        await invoke('plugin:notification|notify', {
+          options: {
+            id,
+            title: NOTIFICATION_TITLE,
+            body: details,
+            largeBody: details,
+            // allowWhileIdle so the alarm fires even in Doze
+            schedule: Schedule.at(dateTime, false, true),
+            actionTypeId: (await registerSnoozeActions()) ?? undefined,
+          },
+        });
+      } else {
+        armTimer(id, details, dateTime.getTime());
+      }
+    } catch (err) {
+      await DB.remove(id);
+      throw err;
     }
 
-    await DB.insert(id, details, dateTime.getTime(), zone);
     emitChange();
   },
 
