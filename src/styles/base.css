@@ -1,0 +1,165 @@
+@import './fonts.css';
+@import './theme.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Overridden at runtime by tauri-plugin-safe-area-insets-css, which writes
+   the real Android system-bar insets as inline styles on <html>. */
+:root {
+  --safe-area-inset-top: 0px;
+  --safe-area-inset-bottom: 0px;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  background-color: var(--surface);
+  color: var(--on-surface);
+  font-family: 'Inter Display', system-ui, -apple-system, sans-serif;
+  /* bodyMedium from the Flutter text theme */
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+/* Typography scale migrated from lib/themes/text_theme.dart */
+.text-body-large { font-size: 18px; font-weight: 400; }
+.text-body-medium { font-size: 16px; font-weight: 400; }
+.text-body-small { font-size: 14px; font-weight: 400; }
+.text-label-large { font-size: 18px; font-weight: 500; }
+.text-label-medium { font-size: 15px; font-weight: 500; }
+.text-label-small { font-size: 12px; font-weight: 500; }
+.text-title-large { font-size: 22px; font-weight: 400; }
+.text-headline-small { font-size: 24px; font-weight: 400; }
+
+button {
+  font-family: inherit;
+  border: none;
+  background: none;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+/* Material-style filled button (FilledButton) */
+.btn-filled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background-color: var(--primary);
+  color: var(--on-primary);
+  border-radius: 100px;
+  padding: 10px 16px;
+  font-size: 18px;
+  font-weight: 500;
+  transition: filter 0.15s ease;
+}
+
+.btn-filled:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.btn-filled:disabled {
+  background-color: rgb(from var(--on-surface) r g b / 0.12);
+  color: rgb(from var(--on-surface) r g b / 0.38);
+}
+
+/* Material-style text button (TextButton) */
+.btn-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  border-radius: 100px;
+  padding: 10px 12px;
+  font-size: 15px;
+  font-weight: 500;
+  transition: background-color 0.15s ease;
+}
+
+.btn-text:hover {
+  background-color: rgb(from var(--primary) r g b / 0.08);
+}
+
+/* Material-style chip (ActionChip) */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background-color: transparent;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  color: var(--on-surface);
+  font-size: 15px;
+  font-weight: 500;
+  padding: 8px 12px;
+  transition: background-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.chip:hover {
+  background-color: rgb(from var(--on-surface) r g b / 0.06);
+}
+
+.chip.chip-pill {
+  border-radius: 32px;
+}
+
+.chip .chip-avatar {
+  color: var(--secondary);
+}
+
+/* Sliding view transitions (pages and Home tabs): both views are pinned to
+   the container so the outgoing one can slide off-screen while the incoming
+   one slides in. The container needs position: relative + overflow: hidden. */
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.3s ease;
+}
+
+.slide-left-enter-from {
+  transform: translateX(100%);
+}
+
+.slide-left-leave-to {
+  transform: translateX(-100%);
+}
+
+.slide-right-enter-from {
+  transform: translateX(-100%);
+}
+
+.slide-right-leave-to {
+  transform: translateX(100%);
+}

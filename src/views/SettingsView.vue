@@ -1,0 +1,147 @@
+<script setup lang="ts">
+import { ref } from 'vue';
+import BadgedIcon from '../components/BadgedIcon.vue';
+import DurationEditDialog from '../components/DurationEditDialog.vue';
+import LabeledSwitch from '../components/LabeledSwitch.vue';
+import ThemeSelector from '../components/ThemeSelector.vue';
+import { durationFromElements, type DurationOption } from '../lib/duration';
+import { useSettingsStore } from '../stores/settings';
+
+/**
+ * Mirrors SettingsPage: theme selector, Quick-Schedule section, and Reminder
+ * Snooze section, each with three editable duration chips.
+ */
+const settings = useSettingsStore();
+
+type OptionGroup = 'quick' | 'snooze';
+
+const editing = ref<{ group: OptionGroup; index: number; option: DurationOption } | null>(null);
+
+function edit(group: OptionGroup, index: number, option: DurationOption): void {
+  editing.value = { group, index, option };
+}
+
+function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
+  if (editing.value === null) return;
+  const { group, index } = editing.value;
+  const source =
+    group === 'quick' ? [...settings.quickScheduleOptions] : [...settings.notifSnoozeOptions];
+  source[index] = durationFromElements(value, unit);
+  if (group === 'quick') settings.setQuickScheduleOptions(source);
+  else settings.setNotifSnoozeOptions(source);
+  editing.value = null;
+}
+</script>
+
+<template>
+  <div class="settings">
+    <section class="settings-container theme-section">
+      <ThemeSelector />
+    </section>
+
+    <section class="settings-container">
+      <LabeledSwitch
+        :model-value="settings.showQuickSchedule"
+        @update:model-value="settings.setShowQuickSchedule($event)"
+      >
+        <span class="section-title">
+          <BadgedIcon icon="fa-solid fa-bell" badge="fa-solid fa-bolt" :size="17" class="section-icon" />
+          Quick-Schedule
+        </span>
+      </LabeledSwitch>
+      <div class="option-chips">
+        <button
+          v-for="(option, index) in settings.quickOptions"
+          :key="`quick-${index}`"
+          type="button"
+          class="chip chip-pill option-chip"
+          @click="edit('quick', index, option)"
+        >
+          <i class="fa-solid fa-pencil chip-avatar edit-icon" aria-hidden="true"></i>
+          {{ option.label }}
+        </button>
+      </div>
+    </section>
+
+    <section class="settings-container">
+      <LabeledSwitch
+        :model-value="settings.showNotifSnooze"
+        @update:model-value="settings.setShowNotifSnooze($event)"
+      >
+        <span class="section-title">
+          <BadgedIcon icon="fa-solid fa-bell" badge="fa-solid fa-circle-pause" :size="17" class="section-icon" />
+          Reminder Snooze
+        </span>
+      </LabeledSwitch>
+      <div class="option-chips">
+        <button
+          v-for="(option, index) in settings.snoozeOptions"
+          :key="`snooze-${index}`"
+          type="button"
+          class="chip chip-pill option-chip"
+          @click="edit('snooze', index, option)"
+        >
+          <i class="fa-solid fa-pencil chip-avatar edit-icon" aria-hidden="true"></i>
+          {{ option.label }}
+        </button>
+      </div>
+    </section>
+
+    <DurationEditDialog
+      :option="editing?.option ?? null"
+      @save="saveEdit"
+      @dismiss="editing = null"
+    />
+  </div>
+</template>
+
+<style scoped>
+.settings {
+  height: 100%;
+  overflow-y: auto;
+  padding: 30px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.settings-container {
+  background-color: var(--surface-variant);
+  border-radius: 16px;
+  padding: 12px 0;
+}
+
+.theme-section {
+  padding: 12px 24px;
+}
+
+.section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.section-icon {
+  color: var(--secondary);
+}
+
+.option-chips {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px 12px 0;
+  flex-wrap: wrap;
+}
+
+.option-chip {
+  font-size: 15px;
+  padding: 8px 12px;
+}
+
+.edit-icon {
+  font-size: 10px;
+}
+</style>

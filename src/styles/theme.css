@@ -1,0 +1,113 @@
+/*
+ * Material 3 "blue" color scheme migrated 1-1 from
+ * remind-me/lib/themes/theme.blue.dart. Tokens keep their Material names so
+ * the mapping back to the Flutter theme stays obvious.
+ */
+
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --surface-tint: #006496;
+
+  --primary: #006496;
+  --on-primary: #ffffff;
+  --primary-container: #cce5ff;
+  --on-primary-container: #001e31;
+  --inverse-primary: #91cdff;
+
+  --secondary: #50606f;
+  --on-secondary: #ffffff;
+  --secondary-container: #d4e4f6;
+  --on-secondary-container: #0d1d2a;
+
+  --tertiary: #964900;
+  --on-tertiary: #ffffff;
+  --tertiary-container: #ffdcc6;
+  --on-tertiary-container: #311300;
+
+  --error: #b3261e;
+  --on-error: #ffffff;
+  --error-container: #e6aca9;
+  --on-error-container: #330b09;
+
+  --background: #fbfcfe;
+  --on-background: #191c1d;
+
+  --surface: #fbfcfe;
+  --on-surface: #191c1d;
+
+  --surface-variant: #eff0f6;
+  --on-surface-variant: #40484b;
+
+  --inverse-surface: #2e3132;
+  --on-inverse-surface: #eff1f2;
+
+  --outline: #70787c;
+  --outline-variant: #bfc8cc;
+
+  --shadow: #000000;
+  --scrim: #000000;
+
+  /* Flutter's ThemeData.dividerColor resolves to the outline-variant family */
+  --divider: rgb(from var(--outline-variant) r g b / 0.5);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --surface-tint: #91cdff;
+
+  --primary: #91cdff;
+  --on-primary: #003350;
+  --primary-container: #004b72;
+  --on-primary-container: #cce5ff;
+  --inverse-primary: #006496;
+
+  --secondary: #b8c8d9;
+  --on-secondary: #22323f;
+  --secondary-container: #394856;
+  --on-secondary-container: #d4e4f6;
+
+  --tertiary: #ffb786;
+  --on-tertiary: #502400;
+  --tertiary-container: #723600;
+  --on-tertiary-container: #ffdcc6;
+
+  --error: #e69490;
+  --on-error: #4c100d;
+  --error-container: #661511;
+  --on-error-container: #e6aca9;
+
+  --background: #191c1d;
+  --on-background: #e1e3e4;
+
+  --surface: #191c1d;
+  --on-surface: #e1e3e4;
+
+  --surface-variant: #313638;
+  --on-surface-variant: #bfc8cc;
+
+  --inverse-surface: #e1e3e4;
+  --on-inverse-surface: #191c1d;
+
+  --outline: #899296;
+  --outline-variant: #353a3c;
+
+  --shadow: #000000;
+  --scrim: #000000;
+
+  --divider: rgb(from var(--outline-variant) r g b / 0.5);
+}
+
+/*
+ * Tokens that always use the DARK scheme regardless of the active theme —
+ * the Flutter app hardcoded `darkColorScheme` for the app bar and toasts.
+ */
+:root {
+  --dark-primary: #91cdff;
+  --dark-surface: #191c1d;
+  --dark-on-surface: #e1e3e4;
+  --dark-surface-variant: #313638;
+  --dark-on-surface-variant: #bfc8cc;
+}
