@@ -85,9 +85,24 @@ function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
           Reminder Snooze
         </span>
       </LabeledSwitch>
+
+      <div class="sub-option">
+        <LabeledSwitch
+          :model-value="settings.notifSnoozeCustomButton"
+          @update:model-value="settings.setNotifSnoozeCustomButton($event)"
+        >
+          <span class="sub-title">
+            <i class="fa-regular fa-clock sub-icon" aria-hidden="true"></i>
+            Custom duration button
+          </span>
+        </LabeledSwitch>
+      </div>
+
+      <!-- Live preview of the notification's action buttons: the editable
+           presets that fit, plus the fixed "Custom…" action when enabled. -->
       <div class="option-chips">
         <button
-          v-for="(option, index) in settings.snoozeOptions"
+          v-for="(option, index) in settings.visibleSnoozeOptions"
           :key="`snooze-${index}`"
           type="button"
           class="chip chip-pill option-chip"
@@ -96,6 +111,13 @@ function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
           <i class="fa-solid fa-pencil chip-avatar edit-icon" aria-hidden="true"></i>
           {{ option.label }}
         </button>
+        <span
+          v-if="settings.notifSnoozeCustomButton"
+          class="chip chip-pill option-chip custom-chip"
+        >
+          <i class="fa-regular fa-clock chip-avatar" aria-hidden="true"></i>
+          Custom…
+        </span>
       </div>
     </section>
 
@@ -144,6 +166,28 @@ function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
   font-size: 17px;
 }
 
+/* Nested sub-toggle within a section, one step down the visual hierarchy. */
+.sub-option {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--divider);
+}
+
+.sub-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 16px;
+  color: var(--on-surface-variant);
+}
+
+.sub-icon {
+  color: var(--secondary);
+  font-size: 15px;
+  width: 17px;
+  text-align: center;
+}
+
 .option-chips {
   display: flex;
   align-items: center;
@@ -156,6 +200,19 @@ function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
 .option-chip {
   font-size: 15px;
   padding: 8px 12px;
+}
+
+/* Fixed preview of the "Custom…" action: styled like a preset chip but
+   accent-tinted and non-editable (no pencil, not clickable). */
+.custom-chip,
+.custom-chip:hover {
+  color: var(--primary);
+  background-color: rgb(from var(--primary) r g b / 0.1);
+  cursor: default;
+}
+
+.custom-chip .chip-avatar {
+  color: var(--primary);
 }
 
 .edit-icon {

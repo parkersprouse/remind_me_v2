@@ -34,3 +34,10 @@ tauri-plugin-process = "2"
 tauri-plugin-os = "2"
 tauri-plugin-safe-area-insets-css = "0.2"
 
+# Vendored with a one-line Kotlin fix: upstream 2.3.3 stores notification
+# action buttons under the wrong SharedPreferences keys, so every action
+# renders with an empty title and reports an empty action id when tapped
+# (see android/src/main/java/NotificationStorage.kt in the vendored copy).
+[patch.crates-io]
+tauri-plugin-notification = { path = "vendored/tauri-plugin-notification" }
+

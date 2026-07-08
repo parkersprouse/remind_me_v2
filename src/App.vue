@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch, type Component } from 'vue';
 import BadgedIcon from './components/BadgedIcon.vue';
+import SnoozeDialog from './components/SnoozeDialog.vue';
 import ToasterHost from './components/ToasterHost.vue';
 import LandingView from './views/LandingView.vue';
 import HomeView from './views/HomeView.vue';
 import SettingsView from './views/SettingsView.vue';
-import { NotificationManager, Permissions } from './lib/notifications';
+import { customSnoozeRequest, NotificationManager, Permissions } from './lib/notifications';
+import { Toaster } from './lib/toaster';
 import { useRouterStore, type Page } from './stores/router';
 import { useSettingsStore } from './stores/settings';
 
@@ -81,6 +83,33 @@ onUnmounted(() => window.removeEventListener('focus', onFocus));
 function debugNotification(): void {
   void NotificationManager.schedule(new Date(Date.now() + 1000), 'Debug Mode Test');
 }
+
+/** Custom snooze flow: the "Custom…" notification action set this request. */
+function dismissSnooze(): void {
+  customSnoozeRequest.value = null;
+}
+
+async function snoozeCustom(minutes: number): Promise<void> {
+  const request = customSnoozeRequest.value;
+  customSnoozeRequest.value = null;
+  if (request === null) return;
+
+  try {
+    await NotificationManager.snooze(request.id, minutes);
+  } catch (err) {
+    console.error('Failed to snooze reminder', err);
+    Toaster.show('Failed to Snooze Reminder', {
+      icon: 'fa-solid fa-circle-exclamation',
+      iconColor: '#f44336',
+    });
+    return;
+  }
+
+  Toaster.show('Reminder Snoozed', {
+    icon: 'fa-solid fa-circle-check',
+    iconColor: '#4caf50',
+  });
+}
 </script>
 
 <template>
@@ -150,6 +179,8 @@ function debugNotification(): void {
         <span class="indicator" aria-hidden="true"></span>
       </button>
     </nav>
+
+    <SnoozeDialog :request="customSnoozeRequest" @save="snoozeCustom" @dismiss="dismissSnooze" />
 
     <ToasterHost />
   </div>

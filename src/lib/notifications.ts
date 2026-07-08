@@ -1,11 +1,12 @@
+import { ref } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import {
   isPermissionGranted,
   requestPermission,
   sendNotification,
   registerActionTypes,
-  onAction,
   onNotificationReceived,
+  active as activeNotifications,
   cancel as cancelPending,
   createChannel,
   Importance,
@@ -13,7 +14,7 @@ import {
   Schedule,
 } from '@tauri-apps/plugin-notification';
 import { DB } from './db';
-import { packageDurations, parseDurationString } from './duration';
+import { parseDurationString } from './duration';
 import {
   isChained,
   nextOccurrence,
@@ -38,6 +39,7 @@ import { useSettingsStore } from '../stores/settings';
 
 const MAX_INT = 0x7fffffff;
 const SNOOZE_PREFIX = 'snooze_';
+const CUSTOM_SNOOZE_ACTION_ID = 'snooze_custom';
 const ACTION_TYPE_ID = 'reminder_actions';
 const NOTIFICATION_TITLE = "Don't Forget!";
 // Android-only: the plugin's built-in "default" channel is IMPORTANCE_DEFAULT,
@@ -48,6 +50,46 @@ const CHANNEL_ID = 'reminders_high';
 
 /** Desktop-only: pending in-app timers keyed by reminder id. */
 const timers = new Map<number, ReturnType<typeof setTimeout>>();
+
+/**
+ * Details of fired one-shots removed by cleanExpired, kept so a snooze action
+ * tapped on a notification whose DB row was already swept (the sweep and the
+ * tap race at launch — the plugin dismisses the notification before the JS
+ * side even boots) can still re-schedule the reminder.
+ */
+const recentlyExpired = new Map<number, string>();
+
+/**
+ * Set when the "Custom…" snooze action is tapped on a delivered notification;
+ * App.vue watches this and presents the custom snooze dialog.
+ */
+export const customSnoozeRequest = ref<{ id: number; details: string } | null>(null);
+
+declare global {
+  interface Window {
+    /**
+     * Bridge target for MainActivity.kt (see there for why the notification
+     * plugin's own actionPerformed event cannot be used on Android). Returns
+     * true so the Kotlin side knows the frontend accepted delivery and can
+     * stop retrying.
+     */
+    androidNotificationAction?: (id: number, actionId: string) => boolean;
+  }
+}
+
+/** Route a notification action tap (from the MainActivity bridge) to snooze. */
+async function handleNotificationAction(id: number, actionId: string): Promise<void> {
+  if (!actionId.startsWith(SNOOZE_PREFIX)) return; // plain body taps just open the app
+
+  if (actionId === CUSTOM_SNOOZE_ACTION_ID) {
+    const details = (await DB.getById(id))?.details ?? recentlyExpired.get(id) ?? '';
+    customSnoozeRequest.value = { id, details };
+    return;
+  }
+
+  const [hours, minutes] = parseDurationString(actionId.slice(SNOOZE_PREFIX.length));
+  await NotificationManager.snooze(id, hours * 60 + minutes);
+}
 
 type ChangeListener = () => void;
 const changeListeners = new Set<ChangeListener>();
@@ -88,14 +130,18 @@ export const NotificationManager = {
         lights: true,
       });
 
-      // Notification action taps (snooze buttons) only exist on mobile.
-      await onAction((notification) => {
-        const actionId = (notification as { actionId?: string }).actionId;
-        const id = notification.id;
-        if (typeof id !== 'number' || !actionId?.startsWith(SNOOZE_PREFIX)) return;
-        const [hours, minutes] = parseDurationString(actionId.replace(SNOOZE_PREFIX, ''));
-        void NotificationManager.snooze(id, hours * 60 + minutes);
-      });
+      // Notification action taps (snooze buttons) arrive via the
+      // MainActivity.kt bridge, NOT the plugin's onAction event: that event
+      // is dropped on cold starts (it fires before any JS listener exists and
+      // the plugin does not buffer) and its payload never carries the
+      // notification id (sourceJson is never populated in plugin 2.3.3), so
+      // it cannot identify which reminder was acted on. Deliberately no
+      // onAction listener here — if a fixed plugin ever delivers the event,
+      // it would double-fire alongside the bridge.
+      window.androidNotificationAction = (id, actionId) => {
+        void handleNotificationAction(id, actionId);
+        return true;
+      };
 
       // Keep repeating reminders rolling: when one is delivered while the app
       // is alive, advance its stored next-occurrence (and re-arm it if the
@@ -110,6 +156,15 @@ export const NotificationManager = {
         void advanceRepeat(id);
       });
     } else {
+      // Browser dev: expose the same bridge so an action tap can be simulated
+      // from the console, e.g. window.androidNotificationAction(id, 'snooze_custom').
+      if (!isTauri) {
+        window.androidNotificationAction = (id, actionId) => {
+          void handleNotificationAction(id, actionId);
+          return true;
+        };
+      }
+
       // Desktop: re-arm in-app timers for everything still in the DB.
       const reminders = await DB.getAll();
       for (const reminder of reminders) {
@@ -178,12 +233,15 @@ export const NotificationManager = {
 
   async snooze(id: number, minutes: number): Promise<void> {
     const reminder = await DB.getById(id);
-    if (reminder === null) return;
+    // Row already swept (the reminder fired and cleanExpired got there
+    // first)? The launch-time sweep remembers what it deleted.
+    const details = reminder?.details ?? recentlyExpired.get(id);
+    if (details === undefined) return;
     // A one-shot moves; a repeating reminder keeps its rule and spawns a
     // one-shot copy instead (cancelling it would kill the recurrence).
-    if (reminder.repeat === null) await NotificationManager.cancel(id);
+    if (reminder !== null && reminder.repeat === null) await NotificationManager.cancel(id);
     const dateTime = new Date(Date.now() + minutes * 60_000);
-    await NotificationManager.schedule(dateTime, reminder.details, reminder.timezone);
+    await NotificationManager.schedule(dateTime, details, reminder?.timezone);
   },
 
   async cancel(id: number): Promise<void> {
@@ -210,7 +268,13 @@ export const NotificationManager = {
    */
   async cleanExpired(): Promise<void> {
     const expired = await DB.getExpired(Date.now());
+    // Mobile: a fired one-shot still sitting in the notification drawer is
+    // still actionable (its snooze buttons need the row), so it survives the
+    // sweep until the notification is tapped or dismissed.
+    const undismissed = await activeNotificationIds();
     for (const reminder of expired) {
+      if (undismissed.has(reminder.id)) continue;
+      recentlyExpired.set(reminder.id, reminder.details);
       await NotificationManager.cancel(reminder.id);
     }
     await rearmRepeats();
@@ -299,17 +363,28 @@ async function registerSnoozeActions(): Promise<string | null> {
   const settings = useSettingsStore();
   if (!settings.showNotifSnooze) return null;
 
-  const options = packageDurations(settings.notifSnoozeOptions);
-  await registerActionTypes([
-    {
-      id: ACTION_TYPE_ID,
-      actions: options.map((option) => ({
-        id: `${SNOOZE_PREFIX}${option.raw}`,
-        title: `+ ${option.label}`,
-      })),
-    },
-  ]);
+  // The visible presets already account for the custom button claiming a slot;
+  // append the custom action only when the setting enables it.
+  const actions = settings.visibleSnoozeOptions.map((option) => ({
+    id: `${SNOOZE_PREFIX}${option.raw}`,
+    title: `+ ${option.label}`,
+  }));
+  if (settings.notifSnoozeCustomButton) {
+    actions.push({ id: CUSTOM_SNOOZE_ACTION_ID, title: 'Custom…' });
+  }
+
+  await registerActionTypes([{ id: ACTION_TYPE_ID, actions }]);
   return ACTION_TYPE_ID;
+}
+
+/** Ids of notifications currently visible in the drawer (mobile only). */
+async function activeNotificationIds(): Promise<Set<number>> {
+  if (!isMobile) return new Set();
+  try {
+    return new Set((await activeNotifications()).map((notification) => notification.id));
+  } catch {
+    return new Set(); // Query failed — fall back to sweeping everything.
+  }
 }
 
 function armTimer(id: number, details: string, epochMillis: number): void {
