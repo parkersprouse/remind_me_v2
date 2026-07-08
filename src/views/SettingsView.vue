@@ -41,6 +41,18 @@ function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
 
     <section class="settings-container">
       <LabeledSwitch
+        :model-value="settings.pageTransitions"
+        @update:model-value="settings.setPageTransitions($event)"
+      >
+        <span class="section-title">
+          <i class="fa-solid fa-arrow-right-arrow-left section-icon plain-icon" aria-hidden="true"></i>
+          Page Transitions
+        </span>
+      </LabeledSwitch>
+    </section>
+
+    <section class="settings-container">
+      <LabeledSwitch
         :model-value="settings.showQuickSchedule"
         @update:model-value="settings.setShowQuickSchedule($event)"
       >
@@ -125,6 +137,11 @@ function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
 
 .section-icon {
   color: var(--secondary);
+}
+
+/* Match the footprint of the BadgedIcon-based section icons */
+.plain-icon {
+  font-size: 17px;
 }
 
 .option-chips {

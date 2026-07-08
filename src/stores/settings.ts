@@ -17,6 +17,10 @@ const Defaults = {
   quickScheduleOptions: ['0:15:00', '0:30:00', '1:00:00'],
   notifSnooze: true,
   notifSnoozeOptions: ['0:15:00', '0:30:00', '1:00:00'],
+  // Slide animation between top-level pages (landing/home/settings); the
+  // swipeable Home tab pager is unaffected. Off by default — page changes
+  // swap instantly.
+  pageTransitions: false,
 };
 
 interface Persistence {
@@ -47,6 +51,7 @@ export const useSettingsStore = defineStore('settings', {
     quickScheduleOptions: Defaults.quickScheduleOptions,
     showNotifSnooze: Defaults.notifSnooze,
     notifSnoozeOptions: Defaults.notifSnoozeOptions,
+    pageTransitions: Defaults.pageTransitions,
     systemPrefersDark: systemDarkQuery.matches,
   }),
 
@@ -74,6 +79,8 @@ export const useSettingsStore = defineStore('settings', {
         (await persisted.get<boolean>('show_notif_snooze')) ?? Defaults.notifSnooze;
       this.notifSnoozeOptions =
         (await persisted.get<string[]>('notif_snooze_options')) ?? Defaults.notifSnoozeOptions;
+      this.pageTransitions =
+        (await persisted.get<boolean>('page_transitions')) ?? Defaults.pageTransitions;
 
       systemDarkQuery.addEventListener('change', (event) => {
         this.systemPrefersDark = event.matches;
@@ -103,6 +110,11 @@ export const useSettingsStore = defineStore('settings', {
     setNotifSnoozeOptions(options: string[]) {
       this.notifSnoozeOptions = options;
       void persisted.set('notif_snooze_options', options);
+    },
+
+    setPageTransitions(enabled: boolean) {
+      this.pageTransitions = enabled;
+      void persisted.set('page_transitions', enabled);
     },
   },
 });

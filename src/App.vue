@@ -36,6 +36,12 @@ watch(
   },
 );
 
+// With page transitions disabled, fall back to a name with no CSS rules:
+// Vue finds no transition styles and swaps the pages instantly.
+const pageTransitionName = computed(() =>
+  settings.pageTransitions ? slideDirection.value : 'page-swap-off',
+);
+
 // Theme handling: settings drive the data-theme attribute the CSS reads.
 watch(
   () => settings.resolvedTheme,
@@ -115,7 +121,7 @@ function debugNotification(): void {
     <!-- IndexedStack equivalent: KeepAlive caches every page's state while
          Transition slides the outgoing and incoming pages past each other -->
     <main class="content">
-      <Transition :name="slideDirection">
+      <Transition :name="pageTransitionName">
         <KeepAlive>
           <component :is="pageComponents[router.page]" :key="router.page" class="page" />
         </KeepAlive>
