@@ -6,6 +6,9 @@ import {
   registerActionTypes,
   onAction,
   cancel as cancelPending,
+  createChannel,
+  Importance,
+  Visibility,
   Schedule,
 } from '@tauri-apps/plugin-notification';
 import { DB } from './db';
@@ -27,6 +30,11 @@ const MAX_INT = 0x7fffffff;
 const SNOOZE_PREFIX = 'snooze_';
 const ACTION_TYPE_ID = 'reminder_actions';
 const NOTIFICATION_TITLE = "Don't Forget!";
+// Android-only: the plugin's built-in "default" channel is IMPORTANCE_DEFAULT,
+// which relegates notifications to the drawer. Reminders need a high-importance
+// channel to pop on-screen (heads-up). Channel importance is frozen by the OS
+// at creation, so a rename of this id is the only way to change it later.
+const CHANNEL_ID = 'reminders_high';
 
 /** Desktop-only: pending in-app timers keyed by reminder id. */
 const timers = new Map<number, ReturnType<typeof setTimeout>>();
@@ -60,6 +68,16 @@ export const Permissions = {
 export const NotificationManager = {
   async init(): Promise<void> {
     if (isMobile) {
+      await createChannel({
+        id: CHANNEL_ID,
+        name: 'Reminders',
+        description: 'Scheduled reminder alerts',
+        importance: Importance.High,
+        visibility: Visibility.Public,
+        vibration: true,
+        lights: true,
+      });
+
       // Notification action taps (snooze buttons) only exist on mobile.
       await onAction((notification) => {
         const actionId = (notification as { actionId?: string }).actionId;
@@ -92,6 +110,7 @@ export const NotificationManager = {
         await invoke('plugin:notification|notify', {
           options: {
             id,
+            channelId: CHANNEL_ID,
             title: NOTIFICATION_TITLE,
             body: details,
             largeBody: details,
