@@ -8,6 +8,8 @@ export interface Reminder {
   details: string;
   scheduledForEpochMillis: number;
   timezone: string;
+  /** Serialized RepeatSpec JSON (see repeat.ts); null for one-shot reminders. */
+  repeat: string | null;
 }
 
 let instance: Database | null = null;
@@ -20,7 +22,13 @@ async function db(): Promise<Database> {
 }
 
 interface ReminderStore {
-  insert(id: number, details: string, scheduledForEpochMillis: number, zone?: string): Promise<void>;
+  insert(
+    id: number,
+    details: string,
+    scheduledForEpochMillis: number,
+    zone?: string,
+    repeat?: string | null,
+  ): Promise<void>;
   getAll(): Promise<Reminder[]>;
   getById(id: number): Promise<Reminder | null>;
   getExpired(epochMillis: number): Promise<Reminder[]>;
@@ -33,10 +41,11 @@ const sqliteStore: ReminderStore = {
     details: string,
     scheduledForEpochMillis: number,
     zone?: string,
+    repeat?: string | null,
   ): Promise<void> {
     await (await db()).execute(
-      'INSERT OR REPLACE INTO reminders (id, details, scheduledForEpochMillis, timezone) VALUES ($1, $2, $3, $4)',
-      [id, details, scheduledForEpochMillis, zone ?? currentTimezone()],
+      'INSERT OR REPLACE INTO reminders (id, details, scheduledForEpochMillis, timezone, repeat) VALUES ($1, $2, $3, $4, $5)',
+      [id, details, scheduledForEpochMillis, zone ?? currentTimezone(), repeat ?? null],
     );
   },
 
@@ -55,8 +64,10 @@ const sqliteStore: ReminderStore = {
   },
 
   async getExpired(epochMillis: number): Promise<Reminder[]> {
+    // Repeating reminders never expire: the OS keeps re-firing them, so a
+    // past scheduledForEpochMillis just means "already fired at least once".
     return (await db()).select<Reminder[]>(
-      'SELECT * FROM reminders WHERE scheduledForEpochMillis < $1 ORDER BY scheduledForEpochMillis ASC',
+      'SELECT * FROM reminders WHERE scheduledForEpochMillis < $1 AND repeat IS NULL ORDER BY scheduledForEpochMillis ASC',
       [epochMillis],
     );
   },
@@ -70,9 +81,15 @@ const sqliteStore: ReminderStore = {
 const memoryStore: ReminderStore = (() => {
   let rows: Reminder[] = [];
   return {
-    async insert(id, details, scheduledForEpochMillis, zone) {
+    async insert(id, details, scheduledForEpochMillis, zone, repeat) {
       rows = rows.filter((row) => row.id !== id);
-      rows.push({ id, details, scheduledForEpochMillis, timezone: zone ?? currentTimezone() });
+      rows.push({
+        id,
+        details,
+        scheduledForEpochMillis,
+        timezone: zone ?? currentTimezone(),
+        repeat: repeat ?? null,
+      });
     },
     async getAll() {
       return [...rows].sort((a, b) => a.scheduledForEpochMillis - b.scheduledForEpochMillis);
@@ -81,7 +98,7 @@ const memoryStore: ReminderStore = (() => {
       return rows.find((row) => row.id === id) ?? null;
     },
     async getExpired(epochMillis) {
-      return rows.filter((row) => row.scheduledForEpochMillis < epochMillis);
+      return rows.filter((row) => row.scheduledForEpochMillis < epochMillis && row.repeat === null);
     },
     async remove(id) {
       rows = rows.filter((row) => row.id !== id);

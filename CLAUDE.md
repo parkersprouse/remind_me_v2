@@ -29,6 +29,8 @@ adb shell am start -n software.greysky.remindme/.MainActivity
 - Wait ~8s after launch before sending adb input events, or an ANR dialog kills the app.
 - Stale dev-cache gotcha: if the installed APK shows "Failed to request http://localhost:1420/", a prior `tauri android dev` left dev-mode build-script output in the cargo cache. Fix: `cd src-tauri && cargo clean -p remind_me && touch build.rs`, then rebuild.
 - Inspect live JS state via WebView CDP: `adb forward tcp:9223 localabstract:webview_devtools_remote_$(adb shell pidof software.greysky.remindme)` then `Runtime.evaluate` over WebSocket. Re-forward after every app restart. Prefer CDP evals over screenshots for asserting app state.
+- `withGlobalTauri` is enabled in `tauri.conf.json`, so CDP evals can drive the backend directly via `window.__TAURI__.core.invoke(...)` (e.g. `plugin:notification|notify`, `plugin:notification|cancel`).
+- The app DB is WAL-mode SQLite at `/data/data/software.greysky.remindme/reminders.db`; to inspect it, `run-as` cat **all three** files (`.db`, `.db-wal`, `.db-shm`) to the host, then open with local `sqlite3` — pulling only the `.db` shows stale pre-checkpoint data.
 
 ## Architecture
 

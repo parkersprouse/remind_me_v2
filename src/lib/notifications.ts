@@ -5,6 +5,7 @@ import {
   sendNotification,
   registerActionTypes,
   onAction,
+  onNotificationReceived,
   cancel as cancelPending,
   createChannel,
   Importance,
@@ -13,6 +14,15 @@ import {
 } from '@tauri-apps/plugin-notification';
 import { DB } from './db';
 import { packageDurations, parseDurationString } from './duration';
+import {
+  isChained,
+  nextOccurrence,
+  parseRepeat,
+  serializeRepeat,
+  toSchedule,
+  withAnchor,
+  type RepeatSpec,
+} from './repeat';
 import { isMobile } from './platform';
 import { isTauri } from './tauri';
 import { useSettingsStore } from '../stores/settings';
@@ -86,6 +96,19 @@ export const NotificationManager = {
         const [hours, minutes] = parseDurationString(actionId.replace(SNOOZE_PREFIX, ''));
         void NotificationManager.snooze(id, hours * 60 + minutes);
       });
+
+      // Keep repeating reminders rolling: when one is delivered while the app
+      // is alive, advance its stored next-occurrence (and re-arm it if the
+      // rule is chained — the OS handles the native ones itself). NOTE:
+      // empirically this event never fires on Android with plugin 2.3.3, so
+      // the cleanExpired() sweep below is the mechanism that actually
+      // advances repeats; this listener is kept as a free upgrade if the
+      // plugin fixes delivery events.
+      await onNotificationReceived((notification) => {
+        const id = notification.id;
+        if (typeof id !== 'number') return;
+        void advanceRepeat(id);
+      });
     } else {
       // Desktop: re-arm in-app timers for everything still in the DB.
       const reminders = await DB.getAll();
@@ -95,33 +118,22 @@ export const NotificationManager = {
     }
   },
 
-  async schedule(dateTime: Date, details: string, zone?: string): Promise<void> {
+  async schedule(
+    dateTime: Date,
+    details: string,
+    zone?: string,
+    repeat?: RepeatSpec | null,
+  ): Promise<void> {
     const id = randomId();
+    const spec = repeat ? withAnchor(repeat, new Date()) : null;
+    const fireAt = spec ? nextOccurrence(spec, new Date()) : dateTime;
 
     // All-or-nothing: insert the row first, arm the notification second, and
     // roll the row back if arming fails — either both survive or neither does.
-    await DB.insert(id, details, dateTime.getTime(), zone);
+    await DB.insert(id, details, fireAt.getTime(), zone, spec ? serializeRepeat(spec) : null);
 
     try {
-      if (isMobile) {
-        // Invoked directly rather than through sendNotification(): the
-        // window.Notification shim it wraps is fire-and-forget, so backend
-        // failures would be silently swallowed.
-        await invoke('plugin:notification|notify', {
-          options: {
-            id,
-            channelId: CHANNEL_ID,
-            title: NOTIFICATION_TITLE,
-            body: details,
-            largeBody: details,
-            // allowWhileIdle so the alarm fires even in Doze
-            schedule: Schedule.at(dateTime, false, true),
-            actionTypeId: (await registerSnoozeActions()) ?? undefined,
-          },
-        });
-      } else {
-        armTimer(id, details, dateTime.getTime());
-      }
+      await arm(id, fireAt, details, spec);
     } catch (err) {
       await DB.remove(id);
       throw err;
@@ -130,10 +142,46 @@ export const NotificationManager = {
     emitChange();
   },
 
+  /**
+   * Re-schedule an existing reminder in place, keeping its id: cancel the
+   * pending OS notification (or desktop timer), overwrite the row
+   * (DB.insert is INSERT OR REPLACE), and arm the replacement. Deliberately
+   * not routed through cancel() — that removes the row — or snooze(), which
+   * mints a fresh id.
+   */
+  async update(
+    id: number,
+    dateTime: Date,
+    details: string,
+    zone?: string,
+    repeat?: RepeatSpec | null,
+  ): Promise<void> {
+    if (isMobile) {
+      try {
+        await cancelPending([id]);
+      } catch {
+        // Already delivered or unknown — nothing to cancel.
+      }
+    } else {
+      const timer = timers.get(id);
+      if (timer !== undefined) clearTimeout(timer);
+      timers.delete(id);
+    }
+
+    const spec = repeat ? withAnchor(repeat, new Date()) : null;
+    const fireAt = spec ? nextOccurrence(spec, new Date()) : dateTime;
+
+    await DB.insert(id, details, fireAt.getTime(), zone, spec ? serializeRepeat(spec) : null);
+    await arm(id, fireAt, details, spec);
+    emitChange();
+  },
+
   async snooze(id: number, minutes: number): Promise<void> {
     const reminder = await DB.getById(id);
     if (reminder === null) return;
-    await NotificationManager.cancel(id);
+    // A one-shot moves; a repeating reminder keeps its rule and spawns a
+    // one-shot copy instead (cancelling it would kill the recurrence).
+    if (reminder.repeat === null) await NotificationManager.cancel(id);
     const dateTime = new Date(Date.now() + minutes * 60_000);
     await NotificationManager.schedule(dateTime, reminder.details, reminder.timezone);
   },
@@ -154,14 +202,85 @@ export const NotificationManager = {
     emitChange();
   },
 
-  /** Drop reminders whose scheduled time has already passed. */
+  /**
+   * Drop one-shot reminders whose scheduled time has already passed, and
+   * advance repeating ones past any fired occurrence. Runs at launch and on
+   * every list refresh — for chained repeat rules this sweep is what arms
+   * the next occurrence (the OS only had a one-shot alarm for the last one).
+   */
   async cleanExpired(): Promise<void> {
     const expired = await DB.getExpired(Date.now());
     for (const reminder of expired) {
       await NotificationManager.cancel(reminder.id);
     }
+    await rearmRepeats();
   },
 };
+
+/** Arm the platform notification for a reminder already persisted in the DB. */
+async function arm(
+  id: number,
+  dateTime: Date,
+  details: string,
+  repeat: RepeatSpec | null = null,
+): Promise<void> {
+  if (isMobile) {
+    // One-shots (and chained repeats, whose toSchedule() also yields a
+    // one-shot Schedule.at) use an exact alarm; native repeats map to the
+    // plugin's interval/every schedules.
+    const schedule =
+      repeat === null
+        ? Schedule.at(dateTime, false, true) // allowWhileIdle so the alarm fires even in Doze
+        : toSchedule(repeat, new Date()).schedule;
+
+    // Invoked directly rather than through sendNotification(): the
+    // window.Notification shim it wraps is fire-and-forget, so backend
+    // failures would be silently swallowed.
+    await invoke('plugin:notification|notify', {
+      options: {
+        id,
+        channelId: CHANNEL_ID,
+        title: NOTIFICATION_TITLE,
+        body: details,
+        largeBody: details,
+        schedule,
+        actionTypeId: (await registerSnoozeActions()) ?? undefined,
+      },
+    });
+  } else {
+    armTimer(id, details, dateTime.getTime());
+  }
+}
+
+/**
+ * Advance a repeating reminder past a delivery: store the next occurrence
+ * (so the list stays fresh) and, for chained rules the OS won't re-fire on
+ * its own, arm the next one-shot.
+ */
+async function advanceRepeat(id: number): Promise<void> {
+  const row = await DB.getById(id);
+  const spec = row ? parseRepeat(row.repeat) : null;
+  if (row === null || spec === null) return;
+
+  const next = nextOccurrence(spec, new Date());
+  await DB.insert(id, row.details, next.getTime(), row.timezone, row.repeat);
+  if (isChained(spec)) await arm(id, next, row.details, spec);
+  emitChange();
+}
+
+/**
+ * Launch-time sweep for repeating reminders whose stored occurrence is in
+ * the past (fired while the app was dead): refresh the stored epoch, and
+ * re-arm chained rules — their next one-shot was never scheduled.
+ */
+async function rearmRepeats(): Promise<void> {
+  const now = Date.now();
+  for (const reminder of await DB.getAll()) {
+    const spec = parseRepeat(reminder.repeat);
+    if (spec === null || reminder.scheduledForEpochMillis >= now) continue;
+    await advanceRepeat(reminder.id);
+  }
+}
 
 function randomId(): number {
   // Flutter used Random.secure().nextInt(MAX_INT); crypto is always available
@@ -194,6 +313,10 @@ async function registerSnoozeActions(): Promise<string | null> {
 }
 
 function armTimer(id: number, details: string, epochMillis: number): void {
+  // Replace, never stack: a sweep may re-arm an id that already has a timer.
+  const existing = timers.get(id);
+  if (existing !== undefined) clearTimeout(existing);
+
   const delay = epochMillis - Date.now();
   if (delay > MAX_INT) return; // Beyond setTimeout range (~24.8 days); re-armed on next launch
 
@@ -205,7 +328,17 @@ function armTimer(id: number, details: string, epochMillis: number): void {
         console.info(`[browser-dev] notification: ${NOTIFICATION_TITLE} — ${details}`);
       }
       timers.delete(id);
-      await DB.remove(id);
+      // Repeating reminders roll forward to their next occurrence; one-shots
+      // are done and removed.
+      const row = await DB.getById(id);
+      const spec = row ? parseRepeat(row.repeat) : null;
+      if (row !== null && spec !== null) {
+        const next = nextOccurrence(spec, new Date());
+        await DB.insert(id, row.details, next.getTime(), row.timezone, row.repeat);
+        armTimer(id, row.details, next.getTime());
+      } else {
+        await DB.remove(id);
+      }
       emitChange();
     })();
   }, Math.max(delay, 0));

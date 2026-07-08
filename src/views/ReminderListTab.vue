@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import AppDialog from '../components/AppDialog.vue';
+import EditReminderDialog from '../components/EditReminderDialog.vue';
 import ReminderListEntry from '../components/ReminderListEntry.vue';
 import { NotificationManager, onRemindersChanged } from '../lib/notifications';
 import type { Reminder } from '../lib/db';
@@ -8,8 +9,9 @@ import { DB } from '../lib/db';
 import { useRouterStore } from '../stores/router';
 
 /**
- * Mirrors ListTab: reminder list with pull/press-to-refresh, swipe-to-delete
- * with a confirmation dialog, a details dialog, and an empty state.
+ * Mirrors ListTab: reminder list with pull/press-to-refresh, a details dialog
+ * (tap), a long-press context menu with edit/delete, an edit dialog, a delete
+ * confirmation dialog, and an empty state.
  */
 const router = useRouterStore();
 
@@ -17,6 +19,8 @@ const reminders = ref<Reminder[]>([]);
 const loading = ref(true);
 
 const detailsFor = ref<Reminder | null>(null);
+const menuFor = ref<Reminder | null>(null);
+const editFor = ref<Reminder | null>(null);
 const deleteFor = ref<Reminder | null>(null);
 
 async function getReminders(): Promise<void> {
@@ -24,6 +28,19 @@ async function getReminders(): Promise<void> {
   await NotificationManager.cleanExpired();
   reminders.value = await DB.getAll();
   loading.value = false;
+}
+
+// The context menu and the details dialog both route here.
+function openEdit(reminder: Reminder): void {
+  menuFor.value = null;
+  detailsFor.value = null;
+  editFor.value = reminder;
+}
+
+function requestDelete(reminder: Reminder): void {
+  menuFor.value = null;
+  detailsFor.value = null;
+  deleteFor.value = reminder;
 }
 
 async function confirmDelete(): Promise<void> {
@@ -38,7 +55,7 @@ let unsubscribe: (() => void) | undefined;
 
 onMounted(() => {
   void getReminders();
-  // Keep the list in sync when reminders fire/snooze/cancel elsewhere
+  // Keep the list in sync when reminders fire/snooze/cancel/update elsewhere
   unsubscribe = onRemindersChanged(() => {
     void (async () => {
       reminders.value = await DB.getAll();
@@ -77,7 +94,7 @@ defineExpose({ refresh: getReminders });
         :key="reminder.id"
         :reminder="reminder"
         @show-details="detailsFor = $event"
-        @request-delete="deleteFor = $event"
+        @long-press="menuFor = $event"
       />
     </div>
 
@@ -89,11 +106,48 @@ defineExpose({ refresh: getReminders });
       </template>
       <p class="details-body">{{ detailsFor?.details }}</p>
       <template #actions>
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label="Edit Reminder"
+          @click="openEdit(detailsFor!)"
+        >
+          <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+        </button>
+        <button
+          type="button"
+          class="icon-btn icon-btn-delete"
+          aria-label="Delete Reminder"
+          @click="requestDelete(detailsFor!)"
+        >
+          <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+        </button>
+        <span class="actions-spacer"></span>
         <button type="button" class="btn-text" @click="detailsFor = null">Close</button>
       </template>
     </AppDialog>
 
-    <!-- Confirm deletion dialog (swipe) -->
+    <!-- Context menu (long-press on an entry) -->
+    <AppDialog :open="menuFor !== null" @dismiss="menuFor = null">
+      <template #title>
+        <span class="menu-title">{{ menuFor?.details }}</span>
+      </template>
+      <div class="menu-items">
+        <button type="button" class="menu-item" @click="openEdit(menuFor!)">
+          <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+          <span>Edit</span>
+        </button>
+        <button type="button" class="menu-item menu-item-delete" @click="requestDelete(menuFor!)">
+          <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+          <span>Delete</span>
+        </button>
+      </div>
+    </AppDialog>
+
+    <!-- Edit reminder dialog -->
+    <EditReminderDialog :reminder="editFor" @dismiss="editFor = null" />
+
+    <!-- Confirm deletion dialog -->
     <AppDialog :open="deleteFor !== null" @dismiss="deleteFor = null">
       <template #title>
         <i class="fa-solid fa-circle-exclamation error-icon" aria-hidden="true"></i>
@@ -169,6 +223,54 @@ defineExpose({ refresh: getReminders });
   user-select: text;
   -webkit-user-select: text;
   overflow-wrap: anywhere;
+}
+
+.icon-btn {
+  padding: 8px 12px;
+  border-radius: 50%;
+  font-size: 18px;
+  color: var(--on-surface-variant);
+}
+
+.icon-btn-delete {
+  color: var(--error);
+}
+
+.actions-spacer {
+  flex: 1;
+}
+
+.menu-title {
+  font-size: 16px;
+  color: var(--on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 16px;
+  color: var(--on-surface);
+  text-align: left;
+}
+
+.menu-item:hover {
+  background-color: rgb(from var(--on-surface) r g b / 0.06);
+}
+
+.menu-item-delete {
+  color: var(--error);
 }
 
 p {
