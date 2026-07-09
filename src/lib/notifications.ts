@@ -274,6 +274,11 @@ async function arm(
       title: NOTIFICATION_TITLE,
       body: details,
       largeBody: details,
+      // Monochrome status-bar icon (res/drawable-anydpi/ic_stat_logo.xml). Android
+      // renders a notification's small icon from its alpha alone, so without a
+      // dedicated glyph the plugin falls back to the full launcher icon and it
+      // shows as a featureless white square. Mirrors the Flutter app's ic_stat_logo.
+      icon: 'ic_stat_logo',
       schedule,
       actionTypeId: (await registerSnoozeActions()) ?? undefined,
     },
