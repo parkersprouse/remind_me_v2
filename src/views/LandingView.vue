@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
 import { exit } from '@tauri-apps/plugin-process';
 import { Permissions } from '../lib/notifications';
-import { isTauri } from '../lib/tauri';
 import { useRouterStore } from '../stores/router';
 
 /**
@@ -14,6 +12,17 @@ import { useRouterStore } from '../stores/router';
 const router = useRouterStore();
 const denied = ref(false);
 
+declare global {
+  interface Window {
+    /**
+     * Native bridge injected by MainActivity.kt (@JavascriptInterface): opens
+     * this app's Android notification settings so the user can re-enable
+     * notifications after denying them.
+     */
+    AndroidNative?: { openNotificationSettings: () => void };
+  }
+}
+
 async function requestPermission(): Promise<void> {
   if (await Permissions.request()) {
     router.goTo('home');
@@ -22,17 +31,11 @@ async function requestPermission(): Promise<void> {
   }
 }
 
-async function openSettings(): Promise<void> {
-  if (!isTauri) return;
-  try {
-    await invoke('open_notification_settings');
-  } catch {
-    // Not supported on this platform; nothing else we can do from here.
-  }
+function openSettings(): void {
+  window.AndroidNative?.openNotificationSettings();
 }
 
 async function exitApp(): Promise<void> {
-  if (!isTauri) return;
   await exit(0);
 }
 </script>

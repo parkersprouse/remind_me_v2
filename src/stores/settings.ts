@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia';
 import { LazyStore } from '@tauri-apps/plugin-store';
 import { packageDurations, type DurationOption } from '../lib/duration';
-import { isTauri } from '../lib/tauri';
 
 // Android renders at most three notification action buttons.
 const MAX_NOTIF_ACTIONS = 3;
@@ -29,23 +28,9 @@ const Defaults = {
   pageTransitions: false,
 };
 
-interface Persistence {
-  get<T>(key: string): Promise<T | undefined>;
-  set(key: string, value: unknown): Promise<void>;
-}
-
-/** Browser-dev fallback: persist to localStorage instead of the store plugin. */
-const localStoragePersistence: Persistence = {
-  async get<T>(key: string): Promise<T | undefined> {
-    const raw = localStorage.getItem(`settings:${key}`);
-    return raw === null ? undefined : (JSON.parse(raw) as T);
-  },
-  async set(key: string, value: unknown): Promise<void> {
-    localStorage.setItem(`settings:${key}`, JSON.stringify(value));
-  },
-};
-
-const persisted: Persistence = isTauri ? new LazyStore('settings.json') : localStoragePersistence;
+// Persistence goes through tauri-plugin-store (settings.json), the moral
+// equivalent of the Flutter app's shared_preferences.
+const persisted = new LazyStore('settings.json');
 
 // Tracks the OS color scheme so `isDarkMode` stays reactive in 'system' mode.
 const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');

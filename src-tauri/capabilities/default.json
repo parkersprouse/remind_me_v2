@@ -7,13 +7,11 @@
   ],
   "permissions": [
     "core:default",
-    "opener:default",
     "sql:default",
     "sql:allow-execute",
     "notification:default",
     "store:default",
     "process:default",
-    "os:default",
     "safe-area-insets-css:default"
   ]
 }

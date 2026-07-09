@@ -2,9 +2,13 @@ package software.greysky.remindme
 
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
+import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
@@ -85,6 +89,41 @@ class MainActivity : TauriActivity() {
 
   override fun onWebViewCreate(webView: WebView) {
     this.webView = webView
+    // Expose the JS -> native bridge as `window.AndroidNative` (see NativeBridge).
+    webView.addJavascriptInterface(NativeBridge(), "AndroidNative")
+  }
+
+  /**
+   * JS -> native bridge reachable from the webview as `window.AndroidNative`.
+   * LandingView.vue calls openNotificationSettings() to send the user to this
+   * app's Android notification settings after they deny the runtime permission
+   * (the Flutter app used the app_settings plugin for the same "permanently
+   * denied" path).
+   */
+  private inner class NativeBridge {
+    @JavascriptInterface
+    fun openNotificationSettings() {
+      // @JavascriptInterface methods run on a WebView background thread; launch
+      // the settings activity from the main thread.
+      runOnUiThread {
+        val intent =
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+              .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+          } else {
+            // ACTION_APP_NOTIFICATION_SETTINGS is API 26+; on 24-25 (minSdk is
+            // 24) fall back to the app detail page, which has a notifications
+            // entry.
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+              .setData(Uri.fromParts("package", packageName, null))
+          }
+        try {
+          startActivity(intent)
+        } catch (_: Exception) {
+          // No settings activity resolvable on this device; nothing else to do.
+        }
+      }
+    }
   }
 
   private fun fingerprint(intent: Intent?): String? {

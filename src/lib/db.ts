@@ -1,6 +1,5 @@
 import Database from '@tauri-apps/plugin-sql';
 import { currentTimezone } from './format';
-import { isTauri } from './tauri';
 
 /** Mirrors the Reminder model + sqflite table from the Flutter app. */
 export interface Reminder {
@@ -35,7 +34,7 @@ interface ReminderStore {
   remove(id: number): Promise<void>;
 }
 
-const sqliteStore: ReminderStore = {
+export const DB: ReminderStore = {
   async insert(
     id: number,
     details: string,
@@ -76,34 +75,3 @@ const sqliteStore: ReminderStore = {
     await (await db()).execute('DELETE FROM reminders WHERE id = $1', [id]);
   },
 };
-
-/** Browser-dev fallback: keeps reminders in memory so the UI stays usable. */
-const memoryStore: ReminderStore = (() => {
-  let rows: Reminder[] = [];
-  return {
-    async insert(id, details, scheduledForEpochMillis, zone, repeat) {
-      rows = rows.filter((row) => row.id !== id);
-      rows.push({
-        id,
-        details,
-        scheduledForEpochMillis,
-        timezone: zone ?? currentTimezone(),
-        repeat: repeat ?? null,
-      });
-    },
-    async getAll() {
-      return [...rows].sort((a, b) => a.scheduledForEpochMillis - b.scheduledForEpochMillis);
-    },
-    async getById(id) {
-      return rows.find((row) => row.id === id) ?? null;
-    },
-    async getExpired(epochMillis) {
-      return rows.filter((row) => row.scheduledForEpochMillis < epochMillis && row.repeat === null);
-    },
-    async remove(id) {
-      rows = rows.filter((row) => row.id !== id);
-    },
-  };
-})();
-
-export const DB: ReminderStore = isTauri ? sqliteStore : memoryStore;

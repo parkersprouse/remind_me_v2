@@ -3,7 +3,6 @@ import { invoke } from '@tauri-apps/api/core';
 import {
   isPermissionGranted,
   requestPermission,
-  sendNotification,
   registerActionTypes,
   onNotificationReceived,
   active as activeNotifications,
@@ -24,17 +23,14 @@ import {
   withAnchor,
   type RepeatSpec,
 } from './repeat';
-import { isMobile } from './platform';
-import { isTauri } from './tauri';
 import { useSettingsStore } from '../stores/settings';
 
 /**
  * Mirrors NotificationManager from the Flutter app.
  *
- * On mobile, notifications are scheduled through the OS (with snooze action
- * buttons) exactly like flutter_local_notifications did. Desktop OSes have no
- * scheduled-notification API, so there we keep the reminder in SQLite and arm
- * an in-app timer that fires the notification while the app is running.
+ * Reminders are scheduled through the Android OS notification system (with
+ * snooze action buttons) exactly like flutter_local_notifications did, so they
+ * fire whether or not the app is running.
  */
 
 const MAX_INT = 0x7fffffff;
@@ -42,14 +38,11 @@ const SNOOZE_PREFIX = 'snooze_';
 const CUSTOM_SNOOZE_ACTION_ID = 'snooze_custom';
 const ACTION_TYPE_ID = 'reminder_actions';
 const NOTIFICATION_TITLE = "Don't Forget!";
-// Android-only: the plugin's built-in "default" channel is IMPORTANCE_DEFAULT,
-// which relegates notifications to the drawer. Reminders need a high-importance
-// channel to pop on-screen (heads-up). Channel importance is frozen by the OS
-// at creation, so a rename of this id is the only way to change it later.
+// The plugin's built-in "default" channel is IMPORTANCE_DEFAULT, which relegates
+// notifications to the drawer. Reminders need a high-importance channel to pop
+// on-screen (heads-up). Channel importance is frozen by the OS at creation, so a
+// rename of this id is the only way to change it later.
 const CHANNEL_ID = 'reminders_high';
-
-/** Desktop-only: pending in-app timers keyed by reminder id. */
-const timers = new Map<number, ReturnType<typeof setTimeout>>();
 
 /**
  * Details of fired one-shots removed by cleanExpired, kept so a snooze action
@@ -106,71 +99,52 @@ function emitChange(): void {
 
 export const Permissions = {
   async status(): Promise<boolean> {
-    if (!isTauri) return true; // Browser-dev fallback
     return isPermissionGranted();
   },
 
   /** Returns true when granted. */
   async request(): Promise<boolean> {
-    if (!isTauri) return true; // Browser-dev fallback
     return (await requestPermission()) === 'granted';
   },
 };
 
 export const NotificationManager = {
   async init(): Promise<void> {
-    if (isMobile) {
-      await createChannel({
-        id: CHANNEL_ID,
-        name: 'Reminders',
-        description: 'Scheduled reminder alerts',
-        importance: Importance.High,
-        visibility: Visibility.Public,
-        vibration: true,
-        lights: true,
-      });
+    await createChannel({
+      id: CHANNEL_ID,
+      name: 'Reminders',
+      description: 'Scheduled reminder alerts',
+      importance: Importance.High,
+      visibility: Visibility.Public,
+      vibration: true,
+      lights: true,
+    });
 
-      // Notification action taps (snooze buttons) arrive via the
-      // MainActivity.kt bridge, NOT the plugin's onAction event: that event
-      // is dropped on cold starts (it fires before any JS listener exists and
-      // the plugin does not buffer) and its payload never carries the
-      // notification id (sourceJson is never populated in plugin 2.3.3), so
-      // it cannot identify which reminder was acted on. Deliberately no
-      // onAction listener here — if a fixed plugin ever delivers the event,
-      // it would double-fire alongside the bridge.
-      window.androidNotificationAction = (id, actionId) => {
-        void handleNotificationAction(id, actionId);
-        return true;
-      };
+    // Notification action taps (snooze buttons) arrive via the
+    // MainActivity.kt bridge, NOT the plugin's onAction event: that event
+    // is dropped on cold starts (it fires before any JS listener exists and
+    // the plugin does not buffer) and its payload never carries the
+    // notification id (sourceJson is never populated in plugin 2.3.3), so
+    // it cannot identify which reminder was acted on. Deliberately no
+    // onAction listener here — if a fixed plugin ever delivers the event,
+    // it would double-fire alongside the bridge.
+    window.androidNotificationAction = (id, actionId) => {
+      void handleNotificationAction(id, actionId);
+      return true;
+    };
 
-      // Keep repeating reminders rolling: when one is delivered while the app
-      // is alive, advance its stored next-occurrence (and re-arm it if the
-      // rule is chained — the OS handles the native ones itself). NOTE:
-      // empirically this event never fires on Android with plugin 2.3.3, so
-      // the cleanExpired() sweep below is the mechanism that actually
-      // advances repeats; this listener is kept as a free upgrade if the
-      // plugin fixes delivery events.
-      await onNotificationReceived((notification) => {
-        const id = notification.id;
-        if (typeof id !== 'number') return;
-        void advanceRepeat(id);
-      });
-    } else {
-      // Browser dev: expose the same bridge so an action tap can be simulated
-      // from the console, e.g. window.androidNotificationAction(id, 'snooze_custom').
-      if (!isTauri) {
-        window.androidNotificationAction = (id, actionId) => {
-          void handleNotificationAction(id, actionId);
-          return true;
-        };
-      }
-
-      // Desktop: re-arm in-app timers for everything still in the DB.
-      const reminders = await DB.getAll();
-      for (const reminder of reminders) {
-        armTimer(reminder.id, reminder.details, reminder.scheduledForEpochMillis);
-      }
-    }
+    // Keep repeating reminders rolling: when one is delivered while the app
+    // is alive, advance its stored next-occurrence (and re-arm it if the
+    // rule is chained — the OS handles the native ones itself). NOTE:
+    // empirically this event never fires on Android with plugin 2.3.3, so
+    // the cleanExpired() sweep below is the mechanism that actually
+    // advances repeats; this listener is kept as a free upgrade if the
+    // plugin fixes delivery events.
+    await onNotificationReceived((notification) => {
+      const id = notification.id;
+      if (typeof id !== 'number') return;
+      void advanceRepeat(id);
+    });
   },
 
   async schedule(
@@ -211,16 +185,10 @@ export const NotificationManager = {
     zone?: string,
     repeat?: RepeatSpec | null,
   ): Promise<void> {
-    if (isMobile) {
-      try {
-        await cancelPending([id]);
-      } catch {
-        // Already delivered or unknown — nothing to cancel.
-      }
-    } else {
-      const timer = timers.get(id);
-      if (timer !== undefined) clearTimeout(timer);
-      timers.delete(id);
+    try {
+      await cancelPending([id]);
+    } catch {
+      // Already delivered or unknown — nothing to cancel.
     }
 
     const spec = repeat ? withAnchor(repeat, new Date()) : null;
@@ -245,16 +213,10 @@ export const NotificationManager = {
   },
 
   async cancel(id: number): Promise<void> {
-    if (isMobile) {
-      try {
-        await cancelPending([id]);
-      } catch {
-        // Already delivered or unknown — nothing to cancel.
-      }
-    } else {
-      const timer = timers.get(id);
-      if (timer !== undefined) clearTimeout(timer);
-      timers.delete(id);
+    try {
+      await cancelPending([id]);
+    } catch {
+      // Already delivered or unknown — nothing to cancel.
     }
     await DB.remove(id);
     emitChange();
@@ -288,32 +250,28 @@ async function arm(
   details: string,
   repeat: RepeatSpec | null = null,
 ): Promise<void> {
-  if (isMobile) {
-    // One-shots (and chained repeats, whose toSchedule() also yields a
-    // one-shot Schedule.at) use an exact alarm; native repeats map to the
-    // plugin's interval/every schedules.
-    const schedule =
-      repeat === null
-        ? Schedule.at(dateTime, false, true) // allowWhileIdle so the alarm fires even in Doze
-        : toSchedule(repeat, new Date()).schedule;
+  // One-shots (and chained repeats, whose toSchedule() also yields a
+  // one-shot Schedule.at) use an exact alarm; native repeats map to the
+  // plugin's interval/every schedules.
+  const schedule =
+    repeat === null
+      ? Schedule.at(dateTime, false, true) // allowWhileIdle so the alarm fires even in Doze
+      : toSchedule(repeat, new Date()).schedule;
 
-    // Invoked directly rather than through sendNotification(): the
-    // window.Notification shim it wraps is fire-and-forget, so backend
-    // failures would be silently swallowed.
-    await invoke('plugin:notification|notify', {
-      options: {
-        id,
-        channelId: CHANNEL_ID,
-        title: NOTIFICATION_TITLE,
-        body: details,
-        largeBody: details,
-        schedule,
-        actionTypeId: (await registerSnoozeActions()) ?? undefined,
-      },
-    });
-  } else {
-    armTimer(id, details, dateTime.getTime());
-  }
+  // Invoked directly rather than through sendNotification(): the
+  // window.Notification shim it wraps is fire-and-forget, so backend
+  // failures would be silently swallowed.
+  await invoke('plugin:notification|notify', {
+    options: {
+      id,
+      channelId: CHANNEL_ID,
+      title: NOTIFICATION_TITLE,
+      body: details,
+      largeBody: details,
+      schedule,
+      actionTypeId: (await registerSnoozeActions()) ?? undefined,
+    },
+  });
 }
 
 /**
@@ -357,7 +315,7 @@ function randomId(): number {
 /**
  * Register the snooze action buttons based on current settings. Returns the
  * action type id to attach to the notification, or null when snooze is
- * disabled. Mobile only — desktop notifications have no action support.
+ * disabled.
  */
 async function registerSnoozeActions(): Promise<string | null> {
   const settings = useSettingsStore();
@@ -377,46 +335,11 @@ async function registerSnoozeActions(): Promise<string | null> {
   return ACTION_TYPE_ID;
 }
 
-/** Ids of notifications currently visible in the drawer (mobile only). */
+/** Ids of notifications currently visible in the drawer. */
 async function activeNotificationIds(): Promise<Set<number>> {
-  if (!isMobile) return new Set();
   try {
     return new Set((await activeNotifications()).map((notification) => notification.id));
   } catch {
     return new Set(); // Query failed — fall back to sweeping everything.
   }
-}
-
-function armTimer(id: number, details: string, epochMillis: number): void {
-  // Replace, never stack: a sweep may re-arm an id that already has a timer.
-  const existing = timers.get(id);
-  if (existing !== undefined) clearTimeout(existing);
-
-  const delay = epochMillis - Date.now();
-  if (delay > MAX_INT) return; // Beyond setTimeout range (~24.8 days); re-armed on next launch
-
-  const timer = setTimeout(() => {
-    void (async () => {
-      if (isTauri) {
-        sendNotification({ title: NOTIFICATION_TITLE, body: details });
-      } else {
-        console.info(`[browser-dev] notification: ${NOTIFICATION_TITLE} — ${details}`);
-      }
-      timers.delete(id);
-      // Repeating reminders roll forward to their next occurrence; one-shots
-      // are done and removed.
-      const row = await DB.getById(id);
-      const spec = row ? parseRepeat(row.repeat) : null;
-      if (row !== null && spec !== null) {
-        const next = nextOccurrence(spec, new Date());
-        await DB.insert(id, row.details, next.getTime(), row.timezone, row.repeat);
-        armTimer(id, row.details, next.getTime());
-      } else {
-        await DB.remove(id);
-      }
-      emitChange();
-    })();
-  }, Math.max(delay, 0));
-
-  timers.set(id, timer);
 }

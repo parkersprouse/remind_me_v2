@@ -1,44 +1,9 @@
 use tauri_plugin_sql::{Migration, MigrationKind};
 
-/// Opens the OS-level notification settings so the user can re-enable
-/// notifications after denying them (mirrors the Flutter app's use of the
-/// `app_settings` plugin).
-#[tauri::command]
-fn open_notification_settings() -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg("x-apple.systempreferences:com.apple.preference.notifications")
-            .spawn()
-            .map_err(|err| err.to_string())?;
-        Ok(())
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "ms-settings:notifications"])
-            .spawn()
-            .map_err(|err| err.to_string())?;
-        Ok(())
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        // No universal notification settings URI on Linux; open the general
-        // settings app if available.
-        std::process::Command::new("gnome-control-center")
-            .arg("notifications")
-            .spawn()
-            .map_err(|err| err.to_string())?;
-        Ok(())
-    }
-
-    #[cfg(mobile)]
-    {
-        Err("Opening notification settings is not supported on this platform yet".into())
-    }
-}
+// Android-only app. Opening the OS notification settings is handled natively in
+// MainActivity.kt (@JavascriptInterface `AndroidNative.openNotificationSettings`),
+// so there is no custom Rust command here — the backend is purely plugin wiring
+// plus the SQLite migration below.
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -66,7 +31,6 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_safe_area_insets_css::init())
-        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
@@ -75,8 +39,6 @@ pub fn run() {
                 .add_migrations("sqlite:reminders.db", migrations)
                 .build(),
         )
-        .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![open_notification_settings])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
