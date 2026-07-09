@@ -19,6 +19,15 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [profile.dev]
 strip = "debuginfo"
 
+# Release: strip all symbols and optimize for size. The shipped `.so` needs no
+# symbols on-device, and this keeps the distributed release APK small.
+[profile.release]
+strip = true
+lto = true
+opt-level = "s"
+codegen-units = 1
+panic = "abort"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

@@ -13,6 +13,17 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// Release signing config is injected from `gen/android/keystore.properties`
+// (gitignored). That file is absent on a fresh clone and on CI without secrets,
+// so every read is guarded: when it's missing, the release build stays unsigned
+// rather than breaking configuration for `debug` too. See RELEASE.md.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+
 android {
     compileSdk = 36
     namespace = "software.greysky.remindme"
@@ -23,6 +34,18 @@ android {
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    signingConfigs {
+        // Only declared when the properties file is present, so a secret-less
+        // checkout can still configure and build `debug`.
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -37,6 +60,12 @@ android {
             }
         }
         getByName("release") {
+            // Attach the release key only when it was declared above; otherwise
+            // Gradle would default this build to the debug key, which is not
+            // release-worthy. An unsigned release APK is the honest fallback.
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }

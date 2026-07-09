@@ -26,6 +26,7 @@ adb install -r <apk>
 adb shell am start -n software.greysky.remindme/.MainActivity
 ```
 
+- **Signed release builds:** `pnpm tauri android build --apk` produces `.../apk/universal/release/app-universal-release.apk`. Signing is wired into `gen/android/app/build.gradle.kts` (release `signingConfig`), which reads `gen/android/keystore.properties` (gitignored; template at `keystore.properties.example`). The block is guarded on that file's existence — absent it, the release build stays *unsigned* rather than breaking `debug`. Release is minified (R8); the reflective Tauri plugin surface + `@JavascriptInterface` bridge survive via the AAR's consumer ProGuard rules (confirmed by exercising notifications on the signed release APK). Full process in [RELEASE.md](RELEASE.md).
 - Wait ~8s after launch before sending adb input events, or an ANR dialog kills the app.
 - Stale dev-cache gotcha: if the installed APK shows "Failed to request http://localhost:1420/", a prior `tauri android dev` left dev-mode build-script output in the cargo cache. Fix: `cd src-tauri && cargo clean -p remind_me && touch build.rs`, then rebuild.
 - Inspect live JS state via WebView CDP: `adb forward tcp:9223 localabstract:webview_devtools_remote_$(adb shell pidof software.greysky.remindme)` then `Runtime.evaluate` over WebSocket. Re-forward after every app restart. Prefer CDP evals over screenshots for asserting app state.

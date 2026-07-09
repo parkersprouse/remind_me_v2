@@ -8,7 +8,10 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "release:build": "tauri android build --apk",
+    "release:verify": "APK=src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk; SDK=\"${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}\"; APKSIGNER=$(ls \"$SDK\"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1); \"$APKSIGNER\" verify --print-certs \"$APK\"",
+    "release": "pnpm run release:build && pnpm run release:verify"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.3.0",
