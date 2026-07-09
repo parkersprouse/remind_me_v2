@@ -1,7 +1,6 @@
 import { ref } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import {
-  isPermissionGranted,
   requestPermission,
   registerActionTypes,
   onNotificationReceived,
@@ -99,7 +98,14 @@ function emitChange(): void {
 
 export const Permissions = {
   async status(): Promise<boolean> {
-    return isPermissionGranted();
+    // Deliberately NOT the plugin's isPermissionGranted() wrapper: it
+    // short-circuits on the webview's cached window.Notification.permission,
+    // which freezes at 'denied' once requestPermission() is rejected and never
+    // re-syncs when the user later enables notifications in system settings
+    // (only a process restart re-reads it). Querying the native command
+    // directly returns the live OS permission, so returning from settings
+    // reflects reality and the landing gate opens. null = "not yet determined".
+    return (await invoke<boolean | null>('plugin:notification|is_permission_granted')) === true;
   },
 
   /** Returns true when granted. */

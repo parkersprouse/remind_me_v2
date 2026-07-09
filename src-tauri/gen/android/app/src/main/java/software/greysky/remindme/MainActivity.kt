@@ -82,6 +82,21 @@ class MainActivity : TauriActivity() {
     captureNotificationAction(intent)
   }
 
+  /**
+   * Tell the frontend the app returned to the foreground. The webview's own
+   * `window` "focus" / `visibilitychange` DOM events do not reliably track the
+   * Android Activity lifecycle, so a user who leaves to toggle a permission in
+   * system settings and comes back would otherwise never trigger a re-check
+   * (see the permission gate in src/App.vue). Unlike the notification-action
+   * bridge this needs no retry polling: a warm resume already has the handler
+   * registered, and cold start is covered by the frontend's onMounted check
+   * (webView may still be null here, before onWebViewCreate).
+   */
+  override fun onResume() {
+    super.onResume()
+    webView?.evaluateJavascript("window.androidResume && window.androidResume()", null)
+  }
+
   override fun onSaveInstanceState(outState: Bundle) {
     super.onSaveInstanceState(outState)
     outState.putString(HANDLED_ACTION_KEY, handledActionFingerprint)

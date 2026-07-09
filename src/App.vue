@@ -11,6 +11,17 @@ import { Toaster } from './lib/toaster';
 import { useRouterStore, type Page } from './stores/router';
 import { useSettingsStore } from './stores/settings';
 
+declare global {
+  interface Window {
+    /**
+     * Bridge target for MainActivity.kt's onResume: re-checks the notification
+     * permission so returning from system settings progresses off the landing
+     * page. See onResume() below.
+     */
+    androidResume?: () => void;
+  }
+}
+
 const router = useRouterStore();
 const settings = useSettingsStore();
 
@@ -67,18 +78,26 @@ async function checkPermission(): Promise<void> {
   }
 }
 
-/** Mirrors didChangeAppLifecycleState: re-check permission on resume. */
-function onFocus(): void {
+/**
+ * Mirrors didChangeAppLifecycleState: re-check permission on resume. Driven by
+ * the native onResume bridge (MainActivity.kt) rather than the DOM `window`
+ * "focus" event, which does not fire when the Android Activity resumes — so
+ * granting the permission in system settings and returning now progresses the
+ * user off the landing page automatically.
+ */
+function onResume(): void {
   void checkPermission();
   if (router.page === 'home') router.setTab(0);
 }
 
 onMounted(() => {
   void checkPermission();
-  window.addEventListener('focus', onFocus);
+  window.androidResume = onResume;
 });
 
-onUnmounted(() => window.removeEventListener('focus', onFocus));
+onUnmounted(() => {
+  delete window.androidResume;
+});
 
 function debugNotification(): void {
   void NotificationManager.schedule(new Date(Date.now() + 1000), 'Debug Mode Test');
