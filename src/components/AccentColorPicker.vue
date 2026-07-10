@@ -1,27 +1,33 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import ColorPickerDialog from './ColorPickerDialog.vue';
 import { contrastingInk, PRESET_ACCENTS } from '../lib/theme';
 import { useSettingsStore } from '../stores/settings';
 
 /**
  * Seed color for the generated Material palette: a row of curated presets plus
- * a free-form swatch backed by the platform color dialog.
+ * a free-form swatch backed by <ColorPickerDialog>. The presets are the only
+ * suggestions on offer -- the custom swatch opens straight onto the accent
+ * currently in use, so nudging it is a short drag rather than a hunt.
  */
 const settings = useSettingsStore();
 
-// <input type="color"> always reports lowercase, so compare on that footing.
+// Hexes are compared lowercased; the picker and the presets agree on that form.
 const selected = computed(() => settings.accentColor.toLowerCase());
 
 const isPreset = computed(() =>
   PRESET_ACCENTS.some((preset) => preset.hex.toLowerCase() === selected.value),
 );
 
+const customOpen = ref(false);
+
 function pick(hex: string): void {
   settings.setAccentColor(hex.toLowerCase());
 }
 
-function pickCustom(event: Event): void {
-  pick((event.target as HTMLInputElement).value);
+function saveCustom(hex: string): void {
+  pick(hex);
+  customOpen.value = false;
 }
 </script>
 
@@ -49,22 +55,27 @@ function pickCustom(event: Event): void {
         ></i>
       </button>
 
-      <!-- The swatch itself is the control; the input is the platform dialog. -->
-      <label
+      <button
+        type="button"
+        role="radio"
+        :aria-checked="!isPreset"
+        aria-label="Custom accent color"
         class="swatch custom"
         :class="{ selected: !isPreset }"
         :style="isPreset ? undefined : { backgroundColor: selected, color: contrastingInk(selected) }"
+        @click="customOpen = true"
       >
         <i v-if="isPreset" class="fa-solid fa-eye-dropper" aria-hidden="true"></i>
         <i v-else class="fa-solid fa-check" aria-hidden="true"></i>
-        <input
-          type="color"
-          :value="selected"
-          aria-label="Custom accent color"
-          @input="pickCustom"
-        />
-      </label>
+      </button>
     </div>
+
+    <ColorPickerDialog
+      :open="customOpen"
+      :initial="selected"
+      @save="saveCustom"
+      @dismiss="customOpen = false"
+    />
   </div>
 </template>
 
@@ -123,14 +134,5 @@ function pickCustom(event: Event): void {
 
 .custom.selected i {
   text-shadow: none;
-}
-
-/* The native color input is the tap target, invisible over its swatch */
-.custom input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  border: none;
-  padding: 0;
 }
 </style>
