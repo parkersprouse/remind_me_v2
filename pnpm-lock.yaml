@@ -11,6 +11,9 @@ importers:
       '@fortawesome/fontawesome-free':
         specifier: ^7.3.0
         version: 7.3.0
+      '@material/material-color-utilities':
+        specifier: ^0.4.0
+        version: 0.4.0
       '@saurl/tauri-plugin-safe-area-insets-css-api':
         specifier: ^0.1.0
         version: 0.1.0
@@ -233,6 +236,9 @@ packages:
 
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
+
+  '@material/material-color-utilities@0.4.0':
+    resolution: {integrity: sha512-dlq6VExJReb8dhjj3a/yTigr3ncNwoFmL5Iy2ENtbDX03EmNeOEdZ+vsaGrj7RTuO+mB7L58II4LCsl4NpM8uw==}
 
   '@rollup/rollup-android-arm-eabi@4.62.2':
     resolution: {integrity: sha512-6o7ZLZK+BeenkZCFNDXqpbjw9bD6nuWonvS/lwQJp7NoVVxm6p3qE7qQ5jGuBjiFsgvqjD8mZAU5oWxTmbOeOg==}
@@ -819,6 +825,8 @@ snapshots:
   '@fortawesome/fontawesome-free@7.3.0': {}
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
+
+  '@material/material-color-utilities@0.4.0': {}
 
   '@rollup/rollup-android-arm-eabi@4.62.2':
     optional: true

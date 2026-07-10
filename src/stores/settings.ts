@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { LazyStore } from '@tauri-apps/plugin-store';
 import { packageDurations, type DurationOption } from '../lib/duration';
+import { DEFAULT_ACCENT } from '../lib/theme';
 
 // Android renders at most three notification action buttons.
 const MAX_NOTIF_ACTIONS = 3;
@@ -15,6 +16,8 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 
 const Defaults = {
   theme: 'system' as ThemeMode,
+  // Seed color the whole Material 3 palette is generated from.
+  accentColor: DEFAULT_ACCENT,
   quickSchedule: true,
   quickScheduleOptions: ['0:15:00', '0:30:00', '1:00:00'],
   notifSnooze: true,
@@ -38,6 +41,7 @@ const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
     theme: Defaults.theme,
+    accentColor: Defaults.accentColor,
     showQuickSchedule: Defaults.quickSchedule,
     quickScheduleOptions: Defaults.quickScheduleOptions,
     showNotifSnooze: Defaults.notifSnooze,
@@ -75,6 +79,7 @@ export const useSettingsStore = defineStore('settings', {
   actions: {
     async load() {
       this.theme = (await persisted.get<ThemeMode>('theme')) ?? Defaults.theme;
+      this.accentColor = (await persisted.get<string>('accent_color')) ?? Defaults.accentColor;
       this.showQuickSchedule =
         (await persisted.get<boolean>('show_quick_schedule')) ?? Defaults.quickSchedule;
       this.quickScheduleOptions =
@@ -97,6 +102,11 @@ export const useSettingsStore = defineStore('settings', {
     setTheme(mode: ThemeMode) {
       this.theme = mode;
       void persisted.set('theme', mode);
+    },
+
+    setAccentColor(hex: string) {
+      this.accentColor = hex;
+      void persisted.set('accent_color', hex);
     },
 
     setShowQuickSchedule(show: boolean) {

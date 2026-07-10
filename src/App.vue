@@ -7,6 +7,7 @@ import LandingView from './views/LandingView.vue';
 import HomeView from './views/HomeView.vue';
 import SettingsView from './views/SettingsView.vue';
 import { customSnoozeRequest, NotificationManager, Permissions } from './lib/notifications';
+import { applyDynamicColor } from './lib/theme';
 import { Toaster } from './lib/toaster';
 import { useRouterStore, type Page } from './stores/router';
 import { useSettingsStore } from './stores/settings';
@@ -55,11 +56,15 @@ const pageTransitionName = computed(() =>
   settings.pageTransitions ? slideDirection.value : 'page-swap-off',
 );
 
-// Theme handling: settings drive the data-theme attribute the CSS reads.
+// Theme handling: data-theme drives color-scheme and the static fallback in
+// theme.css, while the accent seed regenerates the Material palette on top of
+// it. Runs immediately with the defaults, then again once settings.load()
+// hydrates the persisted accent.
 watch(
-  () => settings.resolvedTheme,
-  (theme) => {
+  () => [settings.resolvedTheme, settings.accentColor] as const,
+  ([theme, accent]) => {
     document.documentElement.dataset.theme = theme;
+    applyDynamicColor(accent, theme);
   },
   { immediate: true },
 );

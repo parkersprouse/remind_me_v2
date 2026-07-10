@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import AccentColorPicker from '../components/AccentColorPicker.vue';
 import BadgedIcon from '../components/BadgedIcon.vue';
 import DurationEditDialog from '../components/DurationEditDialog.vue';
 import LabeledSwitch from '../components/LabeledSwitch.vue';
@@ -37,6 +38,9 @@ function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
   <div class="settings">
     <section class="settings-container theme-section">
       <ThemeSelector />
+      <div class="accent-divider">
+        <AccentColorPicker />
+      </div>
     </section>
 
     <section class="settings-container">
@@ -147,6 +151,14 @@ function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
 
 .theme-section {
   padding: 12px 24px;
+}
+
+/* Accent sits under the light/dark control as a second theme choice, using the
+   same separator idiom as the nested toggles further down the page. */
+.accent-divider {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--divider);
 }
 
 .section-title {
