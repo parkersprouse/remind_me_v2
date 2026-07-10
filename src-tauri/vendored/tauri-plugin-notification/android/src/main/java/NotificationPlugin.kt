@@ -135,6 +135,12 @@ class NotificationPlugin(private val activity: Activity): Plugin(activity) {
   fun show(invoke: Invoke) {
     val notification = invoke.parseArgs(Notification::class.java)
     val id = manager.schedule(notification)
+    // VENDORED FIX: upstream only persisted via batch(); show() — the command
+    // the Rust `notify` API routes to — never wrote to NotificationStorage, so
+    // scheduled notifications were invisible to LocalNotificationRestoreReceiver
+    // and none survived a device reboot. appendNotifications() only stores
+    // requests that carry a schedule, so immediate notifications stay unpersisted.
+    notificationStorage.appendNotifications(listOf(notification))
 
     invoke.resolveObject(id)
   }

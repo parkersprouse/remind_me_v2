@@ -6,14 +6,29 @@ package app.tauri.notification
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.fasterxml.jackson.annotation.JsonAutoDetect
+import com.fasterxml.jackson.annotation.PropertyAccessor
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.json.JSONException
 import java.lang.Exception
 
 // Key for private preferences
 private const val NOTIFICATION_STORE_ID = "NOTIFICATION_STORE"
 // Key used to save action types
 private const val ACTION_TYPES_ID = "ACTION_TYPE_STORE"
+
+// VENDORED FIX: the broadcast receivers (boot restore, timed publisher,
+// dismiss) constructed a bare ObjectMapper(), while the plugin writes through
+// Tauri's invoke mapper (field visibility ANY, unknown properties tolerated —
+// see PluginManager in tauri-android). A bare mapper cannot deserialize what
+// the configured one serialized (e.g. JSObject's `nameValuePairs` field), so
+// every read outside the plugin process failed and boot restore was a no-op.
+// This mirrors the tauri-android mapper config; use it wherever a
+// NotificationStorage is created without a live plugin instance.
+fun storageJsonMapper(): ObjectMapper = ObjectMapper()
+  .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+  .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+  .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
 
 class NotificationStorage(private val context: Context, private val jsonMapper: ObjectMapper) {
   fun appendNotifications(localNotifications: List<Notification>) {
@@ -22,7 +37,13 @@ class NotificationStorage(private val context: Context, private val jsonMapper: 
     for (request in localNotifications) {
       if (request.schedule != null) {
         val key: String = request.id.toString()
-        editor.putString(key, request.sourceJson.toString())
+        // VENDORED FIX: upstream stored request.sourceJson, but sourceJson is
+        // never assigned anywhere in the plugin, so every entry was the literal
+        // string "null" and getSavedNotification() could never deserialize it —
+        // which silently broke LocalNotificationRestoreReceiver (no scheduled
+        // notification survived a reboot). Serializing the object itself also
+        // captures the restore receiver's fast-forwarded dates when it re-saves.
+        editor.putString(key, jsonMapper.writeValueAsString(request))
       }
     }
     editor.apply()
@@ -63,7 +84,11 @@ class NotificationStorage(private val context: Context, private val jsonMapper: 
 
     return try {
       jsonMapper.readValue(notificationString, Notification::class.java)
-    } catch (ex: JSONException) {
+    } catch (ex: Exception) {
+      // VENDORED FIX: was `catch (ex: JSONException)`, but Jackson throws its
+      // own exception hierarchy (org.json is never involved here), so any bad
+      // entry — e.g. the "null" strings written by unpatched builds — crashed
+      // the caller (including the boot-restore receiver) instead of skipping.
       null
     }
   }

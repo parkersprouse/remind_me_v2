@@ -117,6 +117,10 @@ internal class NotificationScheduleSerializer @JvmOverloads constructor(t: Class
         sdf.timeZone = TimeZone.getTimeZone("UTC")
         jgen.writeStringField("date", sdf.format(value.date))
         jgen.writeBooleanField("repeating", value.repeating)
+        // VENDORED FIX (all three branches): upstream never serialized
+        // allowWhileIdle, so a notification stored for boot restore came back
+        // with allowWhileIdle=false and lost its Doze-exact alarm semantics.
+        jgen.writeBooleanField("allowWhileIdle", value.allowWhileIdle)
 
         jgen.writeEndObject()
       }
@@ -124,6 +128,7 @@ internal class NotificationScheduleSerializer @JvmOverloads constructor(t: Class
         jgen.writeObjectFieldStart("interval")
 
         jgen.writeObjectField("interval", value.interval)
+        jgen.writeBooleanField("allowWhileIdle", value.allowWhileIdle)
 
         jgen.writeEndObject()
       }
@@ -132,6 +137,7 @@ internal class NotificationScheduleSerializer @JvmOverloads constructor(t: Class
 
         jgen.writeObjectField("interval", value.interval)
         jgen.writeNumberField("count", value.count)
+        jgen.writeBooleanField("allowWhileIdle", value.allowWhileIdle)
 
         jgen.writeEndObject()
       }

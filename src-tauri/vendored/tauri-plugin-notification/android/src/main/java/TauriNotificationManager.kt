@@ -460,7 +460,7 @@ class NotificationDismissReceiver : BroadcastReceiver() {
     val isRemovable =
       intent.getBooleanExtra(NOTIFICATION_IS_REMOVABLE_KEY, true)
     if (isRemovable) {
-      val notificationStorage = NotificationStorage(context, ObjectMapper())
+      val notificationStorage = NotificationStorage(context, storageJsonMapper())
       notificationStorage.deleteNotification(intExtra.toString())
     }
   }
@@ -486,7 +486,7 @@ class TimedNotificationPublisher : BroadcastReceiver() {
     if (id == Int.MIN_VALUE) {
       Logger.error(Logger.tags("Notification"), "No valid id supplied", null)
     }
-    val storage = NotificationStorage(context, ObjectMapper())
+    val storage = NotificationStorage(context, storageJsonMapper())
 
     val savedNotification = storage.getSavedNotification(id.toString())
     if (savedNotification != null) {
@@ -495,7 +495,14 @@ class TimedNotificationPublisher : BroadcastReceiver() {
 
     notificationManager.notify(id, notification)
     if (!rescheduleNotificationIfNeeded(context, intent, id)) {
-      storage.deleteNotification(id.toString())
+      // VENDORED FIX: upstream deleted unconditionally here, but only Interval
+      // schedules re-arm via CRON_KEY above. Every / repeating-At alarms keep
+      // firing through AlarmManager.setRepeating, yet their storage entry was
+      // wiped after the first delivery — so a later reboot restored nothing.
+      // Keep entries whose schedule is not removable (still-active repeats).
+      if (savedNotification?.schedule?.isRemovable() != false) {
+        storage.deleteNotification(id.toString())
+      }
     }
   }
 
@@ -547,7 +554,7 @@ class LocalNotificationRestoreReceiver : BroadcastReceiver() {
       )
       if (um == null || !um.isUserUnlocked) return
     }
-    val storage = NotificationStorage(context, ObjectMapper())
+    val storage = NotificationStorage(context, storageJsonMapper())
     val ids = storage.getSavedNotificationIds()
     val notifications = mutableListOf<Notification>()
     val updatedNotifications = mutableListOf<Notification>()
