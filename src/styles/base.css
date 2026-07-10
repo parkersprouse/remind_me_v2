@@ -14,6 +14,13 @@
   --safe-area-inset-bottom: 0px;
 }
 
+html {
+  /* Suppress the Android WebView's default translucent-blue overlay painted
+     across a tapped element's full bounds (inherited, so this covers all
+     elements). Pressed feedback comes from our own :hover/:active styles. */
+  -webkit-tap-highlight-color: transparent;
+}
+
 html,
 body,
 #app {
