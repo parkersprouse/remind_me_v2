@@ -12,10 +12,9 @@ import {
 } from '@tauri-apps/plugin-notification';
 import { ref } from 'vue';
 
-import { useSettingsStore } from '../stores/settings';
 
-import { DB } from './db';
-import { parseDurationString } from './duration';
+import { DB } from '~lib/db.ts';
+import { parseDurationString } from '~lib/duration.ts';
 import {
   isChained,
   nextOccurrence,
@@ -24,9 +23,10 @@ import {
   toSchedule,
   withAnchor,
 
-} from './repeat';
+} from '~lib/repeat.ts';
+import { useSettingsStore } from '~stores/settings.ts';
 
-import type { RepeatSpec } from './repeat';
+import type { RepeatSpec } from '~lib/repeat.ts';
 
 /**
  * Mirrors NotificationManager from the Flutter app.
@@ -53,13 +53,13 @@ const CHANNEL_ID = 'reminders_high';
  * tap race at launch — the plugin dismisses the notification before the JS
  * side even boots) can still re-schedule the reminder.
  */
-const recentlyExpired = new Map<number, string>();
+const recently_expired = new Map<number, string>();
 
 /**
  * Set when the "Custom…" snooze action is tapped on a delivered notification;
  * App.vue watches this and presents the custom snooze dialog.
  */
-export const customSnoozeRequest = ref<{
+export const custom_snooze_request = ref<{
   id: number;
   details: string;
 } | null>(null);
@@ -81,8 +81,8 @@ async function handleNotificationAction(id: number, actionId: string): Promise<v
   if (!actionId.startsWith(SNOOZE_PREFIX)) return; // plain body taps just open the app
 
   if (actionId === CUSTOM_SNOOZE_ACTION_ID) {
-    const details = (await DB.getById(id))?.details ?? recentlyExpired.get(id) ?? '';
-    customSnoozeRequest.value = {
+    const details = (await DB.getById(id))?.details ?? recently_expired.get(id) ?? '';
+    custom_snooze_request.value = {
       id,
       details,
     };
@@ -90,23 +90,23 @@ async function handleNotificationAction(id: number, actionId: string): Promise<v
   }
 
   const [hours, minutes] = parseDurationString(actionId.slice(SNOOZE_PREFIX.length));
-  await NotificationManager.snooze(id, hours * 60 + minutes);
+  await notification_manager.snooze(id, hours * 60 + minutes);
 }
 
 type ChangeListener = () => void;
-const changeListeners = new Set<ChangeListener>();
+const change_listeners = new Set<ChangeListener>();
 
 /** Subscribe to reminder mutations (fired, snoozed, cancelled). */
 export function onRemindersChanged(listener: ChangeListener): () => void {
-  changeListeners.add(listener);
-  return () => changeListeners.delete(listener);
+  change_listeners.add(listener);
+  return () => change_listeners.delete(listener);
 }
 
 function emitChange(): void {
-  for (const listener of changeListeners) listener();
+  for (const listener of change_listeners) listener();
 }
 
-export const Permissions = {
+export const permissions = {
   async status(): Promise<boolean> {
     // Deliberately NOT the plugin's isPermissionGranted() wrapper: it
     // short-circuits on the webview's cached window.Notification.permission,
@@ -124,7 +124,7 @@ export const Permissions = {
   },
 };
 
-export const NotificationManager = {
+export const notification_manager = {
   async init(): Promise<void> {
     await createChannel({
       id: CHANNEL_ID,
@@ -171,14 +171,14 @@ export const NotificationManager = {
   ): Promise<void> {
     const id = randomId();
     const spec = repeat ? withAnchor(repeat, new Date()) : null;
-    const fireAt = spec ? nextOccurrence(spec, new Date()) : dateTime;
+    const fire_at = spec ? nextOccurrence(spec, new Date()) : dateTime;
 
     // All-or-nothing: insert the row first, arm the notification second, and
     // roll the row back if arming fails — either both survive or neither does.
-    await DB.insert(id, details, fireAt.getTime(), zone, spec ? serializeRepeat(spec) : null);
+    await DB.insert(id, details, fire_at.getTime(), zone, spec ? serializeRepeat(spec) : null);
 
     try {
-      await arm(id, fireAt, details, spec);
+      await arm(id, fire_at, details, spec);
     } catch (err) {
       await DB.remove(id);
       throw err;
@@ -208,10 +208,10 @@ export const NotificationManager = {
     }
 
     const spec = repeat ? withAnchor(repeat, new Date()) : null;
-    const fireAt = spec ? nextOccurrence(spec, new Date()) : dateTime;
+    const fire_at = spec ? nextOccurrence(spec, new Date()) : dateTime;
 
-    await DB.insert(id, details, fireAt.getTime(), zone, spec ? serializeRepeat(spec) : null);
-    await arm(id, fireAt, details, spec);
+    await DB.insert(id, details, fire_at.getTime(), zone, spec ? serializeRepeat(spec) : null);
+    await arm(id, fire_at, details, spec);
     emitChange();
   },
 
@@ -219,13 +219,13 @@ export const NotificationManager = {
     const reminder = await DB.getById(id);
     // Row already swept (the reminder fired and cleanExpired got there
     // first)? The launch-time sweep remembers what it deleted.
-    const details = reminder?.details ?? recentlyExpired.get(id);
+    const details = reminder?.details ?? recently_expired.get(id);
     if (details === undefined) return;
     // A one-shot moves; a repeating reminder keeps its rule and spawns a
     // one-shot copy instead (cancelling it would kill the recurrence).
-    if (reminder !== null && reminder.repeat === null) await NotificationManager.cancel(id);
-    const dateTime = new Date(Date.now() + minutes * 60000);
-    await NotificationManager.schedule(dateTime, details, reminder?.timezone);
+    if (reminder !== null && reminder.repeat === null) await notification_manager.cancel(id);
+    const date_time = new Date(Date.now() + minutes * 60000);
+    await notification_manager.schedule(date_time, details, reminder?.timezone);
   },
 
   async cancel(id: number): Promise<void> {
@@ -252,8 +252,8 @@ export const NotificationManager = {
     const undismissed = await activeNotificationIds();
     for (const reminder of expired) {
       if (undismissed.has(reminder.id)) continue;
-      recentlyExpired.set(reminder.id, reminder.details);
-      await NotificationManager.cancel(reminder.id);
+      recently_expired.set(reminder.id, reminder.details);
+      await notification_manager.cancel(reminder.id);
     }
     await rearmRepeats();
   },

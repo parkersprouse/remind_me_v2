@@ -15,25 +15,27 @@ interface ToasterState {
   current: Toast | null;
 }
 
-export const toasterState = reactive<ToasterState>({ current: null });
+export const toaster_state = reactive<ToasterState>({ current: null });
 
-let hideTimer: ReturnType<typeof setTimeout> | undefined;
+let hide_timer: ReturnType<typeof setTimeout> | undefined;
 
-export const Toaster = {
+export const toaster = {
   show(message: string, options: {
     icon?: string;
     iconColor?: string;
   } = {}): void {
-    toasterState.current = {
+    toaster_state.current = {
       message,
       ...options,
     };
-    if (hideTimer !== undefined) clearTimeout(hideTimer);
+    if (hide_timer !== undefined) clearTimeout(hide_timer);
     // SnackBar's default visibility duration is 4 seconds
-    hideTimer = setTimeout(() => { Toaster.dismiss(); }, 4000);
+    hide_timer = setTimeout(() => {
+      toaster.dismiss();
+    }, 4000);
   },
 
   dismiss(): void {
-    toasterState.current = null;
+    toaster_state.current = null;
   },
 };

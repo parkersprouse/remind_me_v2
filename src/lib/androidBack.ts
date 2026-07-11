@@ -1,4 +1,4 @@
-import { useRouterStore } from '../stores/router';
+import { useRouterStore } from '~stores/router.ts';
 
 /**
  * Bridge for the Android hardware/gesture back action. MainActivity.kt

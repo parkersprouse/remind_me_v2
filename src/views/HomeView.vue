@@ -9,7 +9,7 @@
     @pointercancel='onPointerCancel'
     @click.capture='onClickCapture'
   >
-    <div class='track' :style='trackStyle'>
+    <div class='track' :style='track_style'>
       <NewReminderTab class='tab-page' />
       <ReminderListTab class='tab-page' />
     </div>
@@ -19,10 +19,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import { useRouterStore } from '../stores/router';
-
-import NewReminderTab from './NewReminderTab.vue';
-import ReminderListTab from './ReminderListTab.vue';
+import { useRouterStore } from '~stores/router.ts';
+import NewReminderTab from '~views/NewReminderTab.vue';
+import ReminderListTab from '~views/ReminderListTab.vue';
 
 /**
  * Mirrors the Home TabBarView: both tabs stay mounted side by side in a
@@ -60,14 +59,14 @@ const TAB_COUNT = 2;
 
 const home = ref<HTMLElement | null>(null);
 
-const dragOffset = ref(0);
+const drag_offset = ref(0);
 const dragging = ref(false);
 
-let pointerId = -1;
-let startX = 0;
-let startY = 0;
+let pointer_id = -1;
+let start_x = 0;
+let start_y = 0;
 let tracking = false; // pointer is down but the gesture is unclassified
-let didDrag = false; // suppresses the click that follows a drag
+let did_drag = false; // suppresses the click that follows a drag
 
 /** Recent pointer positions inside VELOCITY_WINDOW_MS, oldest first. */
 let samples: {
@@ -90,8 +89,9 @@ function pushSample(event: PointerEvent): void {
  * paused before lifting reads as zero: its last move predates the window.
  */
 function releaseVelocity(event: PointerEvent): number {
+  if (samples.length === 0) return 0;
   const last = samples[samples.length - 1];
-  if (last === undefined || event.timeStamp - last.t > VELOCITY_WINDOW_MS) return 0;
+  if (event.timeStamp - last.t > VELOCITY_WINDOW_MS) return 0;
   const first = samples[0];
   const dt = last.t - first.t;
   if (dt <= 0) return 0;
@@ -100,11 +100,11 @@ function releaseVelocity(event: PointerEvent): number {
 
 function onPointerDown(event: PointerEvent): void {
   if (!event.isPrimary) return;
-  pointerId = event.pointerId;
-  startX = event.clientX;
-  startY = event.clientY;
+  pointer_id = event.pointerId;
+  start_x = event.clientX;
+  start_y = event.clientY;
   tracking = true;
-  didDrag = false;
+  did_drag = false;
   samples = [{
     t: event.timeStamp,
     x: event.clientX,
@@ -112,10 +112,10 @@ function onPointerDown(event: PointerEvent): void {
 }
 
 function onPointerMove(event: PointerEvent): void {
-  if (event.pointerId !== pointerId) return;
+  if (event.pointerId !== pointer_id) return;
   pushSample(event);
-  const dx = event.clientX - startX;
-  const dy = event.clientY - startY;
+  const dx = event.clientX - start_x;
+  const dy = event.clientY - start_y;
 
   if (!dragging.value) {
     if (!tracking) return;
@@ -126,15 +126,15 @@ function onPointerMove(event: PointerEvent): void {
       return;
     }
     dragging.value = true;
-    didDrag = true;
+    did_drag = true;
     // Keep receiving moves when the finger leaves the element, and stop
     // routing them to children mid-drag.
-    home.value?.setPointerCapture(pointerId);
+    home.value?.setPointerCapture(pointer_id);
   }
 
-  const atStart = router.homeTab === 0 && dx > 0;
-  const atEnd = router.homeTab === TAB_COUNT - 1 && dx < 0;
-  dragOffset.value = atStart || atEnd ? dx / EDGE_RESISTANCE : dx;
+  const at_start = router.homeTab === 0 && dx > 0;
+  const at_end = router.homeTab === TAB_COUNT - 1 && dx < 0;
+  drag_offset.value = at_start || at_end ? dx / EDGE_RESISTANCE : dx;
 }
 
 function settle(commit: boolean, velocity = 0): void {
@@ -144,43 +144,43 @@ function settle(commit: boolean, velocity = 0): void {
     if (Math.abs(velocity) >= FLICK_VELOCITY) {
       // Flick: velocity direction decides, regardless of distance dragged.
       target += velocity < 0 ? 1 : -1;
-    } else if (Math.abs(dragOffset.value) >= width * SNAP_THRESHOLD) {
-      target += dragOffset.value < 0 ? 1 : -1;
+    } else if (Math.abs(drag_offset.value) >= width * SNAP_THRESHOLD) {
+      target += drag_offset.value < 0 ? 1 : -1;
     }
     if (target !== router.homeTab && target >= 0 && target < TAB_COUNT) {
       router.setTab(target);
     }
   }
-  // homeTab and dragOffset change in the same render, so the track's CSS
+  // homeTab and drag_offset change in the same render, so the track's CSS
   // transition animates from the released position to the settled page.
   dragging.value = false;
   tracking = false;
-  dragOffset.value = 0;
-  pointerId = -1;
+  drag_offset.value = 0;
+  pointer_id = -1;
 }
 
 function onPointerUp(event: PointerEvent): void {
-  if (event.pointerId !== pointerId) return;
+  if (event.pointerId !== pointer_id) return;
   settle(dragging.value, releaseVelocity(event));
 }
 
 // The webview cancels the pointer stream when it claims the gesture for
 // native scrolling; snap back rather than acting on a stale drag.
 function onPointerCancel(event: PointerEvent): void {
-  if (event.pointerId !== pointerId) return;
+  if (event.pointerId !== pointer_id) return;
   settle(false);
 }
 
 // A drag released over a button would otherwise register as a tap on it.
 function onClickCapture(event: MouseEvent): void {
-  if (!didDrag) return;
-  didDrag = false;
+  if (!did_drag) return;
+  did_drag = false;
   event.preventDefault();
   event.stopPropagation();
 }
 
-const trackStyle = computed(() => ({
-  transform: `translateX(calc(${-router.homeTab * 100}% + ${dragOffset.value}px))`,
+const track_style = computed(() => ({
+  transform: `translateX(calc(${-router.homeTab * 100}% + ${drag_offset.value}px))`,
 }));
 </script>
 

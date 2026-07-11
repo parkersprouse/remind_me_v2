@@ -81,9 +81,9 @@ export function serializeRepeat(spec: RepeatSpec): string {
 export function parseRepeat(json: string | null): RepeatSpec | null {
   if (json === null || json === '') return null;
   try {
-    const value = JSON.parse(json) as RepeatSpec;
+    const value = JSON.parse(json) as { kind?: string; };
     if (value.kind === 'interval' || value.kind === 'weekly' || value.kind === 'monthly') {
-      return value;
+      return value as RepeatSpec;
     }
     return null;
   } catch {
@@ -105,7 +105,7 @@ export function ordinal(n: number): string {
   return `${n}th`;
 }
 
-const timeFormatter = new Intl.DateTimeFormat('en-US', {
+const time_formatter = new Intl.DateTimeFormat('en-US', {
   hour: 'numeric',
   minute: '2-digit',
 });
@@ -113,7 +113,7 @@ const timeFormatter = new Intl.DateTimeFormat('en-US', {
 function formatRuleTime(hour: number, minute: number): string {
   const d = new Date();
   d.setHours(hour, minute, 0, 0);
-  return timeFormatter.format(d);
+  return time_formatter.format(d);
 }
 
 /** "Every 15 minutes", "Every Tuesday at 9:00 AM", "Every 2nd Tuesday at 9:00 AM". */
@@ -134,6 +134,7 @@ export function describeRepeat(spec: RepeatSpec): string {
         spec.every === 1 ? `Monthly on ${day}` : `Every ${ordinal(spec.every)} month on ${day}`;
       return `${prefix} at ${formatRuleTime(spec.hour, spec.minute)}`;
     }
+    // no default
   }
 }
 
@@ -166,13 +167,13 @@ function nextChainedOccurrence(
   spec: Extract<RepeatSpec, { kind: 'weekly' | 'monthly'; }>,
   after: Date,
 ): Date {
-  const anchorEpoch = spec.anchor;
-  if (anchorEpoch === undefined) {
+  const anchor_epoch = spec.anchor;
+  if (anchor_epoch === undefined) {
     // No anchor yet — the first occurrence is the plain next match.
     return spec.kind === 'weekly' ? nextWeeklyMatch(spec, after) : nextMonthlyMatch(spec, after);
   }
 
-  const anchor = new Date(anchorEpoch);
+  const anchor = new Date(anchor_epoch);
   const d = new Date(anchor);
   while (d.getTime() <= after.getTime()) {
     if (spec.kind === 'weekly') {
@@ -193,6 +194,7 @@ export function nextOccurrence(spec: RepeatSpec, after: Date): Date {
       return spec.every === 1 ? nextWeeklyMatch(spec, after) : nextChainedOccurrence(spec, after);
     case 'monthly':
       return spec.every === 1 ? nextMonthlyMatch(spec, after) : nextChainedOccurrence(spec, after);
+    // no default
   }
 }
 
@@ -266,5 +268,6 @@ export function toSchedule(spec: RepeatSpec, from: Date): RepeatSchedule {
         chained: true,
       };
     }
+    // no default
   }
 }

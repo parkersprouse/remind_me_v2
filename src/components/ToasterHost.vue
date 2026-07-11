@@ -1,14 +1,14 @@
 <template>
   <Transition name='toast'>
-    <div v-if='toasterState.current' class='toast'>
+    <div v-if='toaster_state.current' class='toast'>
       <i
-        v-if='toasterState.current.icon'
-        :class='toasterState.current.icon'
-        :style="{ color: toasterState.current.iconColor ?? 'var(--dark-primary)' }"
+        v-if='toaster_state.current.icon'
+        :class='toaster_state.current.icon'
+        :style="{ color: toaster_state.current.iconColor ?? 'var(--dark-primary)' }"
         aria-hidden='true'
       />
-      <span class='message'>{{ toasterState.current.message }}</span>
-      <button type='button' class='close' aria-label='Close' @click='Toaster.dismiss()'>
+      <span class='message'>{{ toaster_state.current.message }}</span>
+      <button type='button' class='close' aria-label='Close' @click='toaster.dismiss()'>
         <i class='fa-solid fa-xmark' aria-hidden='true'/>
       </button>
     </div>
@@ -16,7 +16,7 @@
 </template>
 
 <script setup lang="ts">
-import { Toaster, toasterState } from '../lib/toaster';
+import { toaster, toaster_state } from '~lib/toaster.ts';
 </script>
 
 <style scoped>
