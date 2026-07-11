@@ -1,3 +1,5 @@
+import { fileURLToPath, URL } from 'node:url';
+
 import eslint from '@eslint/js';
 import stylistic from '@stylistic/eslint-plugin';
 import { defineConfigWithVueTs, vueTsConfigs } from '@vue/eslint-config-typescript';
@@ -72,6 +74,7 @@ export default defineConfigWithVueTs(
           ts: '@typescript-eslint/parser',
         },
         sourceType: 'module',
+        tsconfigRootDir: fileURLToPath(new URL('./', import.meta.url)),
       },
     },
     plugins: {
@@ -185,11 +188,9 @@ export default defineConfigWithVueTs(
       'no-class-assign': 'error',
       'no-compare-neg-zero': 'error',
       'no-cond-assign': 'error',
-      // 'no-console': process.env.NODE_ENV === 'production' ? 'error' : 'off',
       'no-const-assign': 'error',
       'no-constant-condition': 'error',
       'no-control-regex': 'error',
-      // 'no-debugger': process.env.NODE_ENV === 'production' ? 'error' : 'off',
       'no-delete-var': 'error',
       'no-dupe-args': 'error',
       'no-dupe-class-members': 'error',
@@ -877,25 +878,24 @@ export default defineConfigWithVueTs(
 
   /**
    * ------------------------------------------------------------------------------
-   * ESLint Import rule customization (for the browser)
+   * ESLint Import rule customization
    * https://github.com/import-js/eslint-plugin-import-x/tree/main#rules
    */
   {
     rules: {
-      'import-x/no-nodejs-modules': 'error',
+      'import-x/no-nodejs-modules': 'off',
     },
   },
 
   /**
    * ------------------------------------------------------------------------------
    * We want to allow NodeJS modules to be imported in any config / build scripts,
-   *   while making sure files under the `src/` directory aren't impacted.
+   *   while making sure files under the `src/` directory aren't allowed to.
    */
   {
     files: exts.map((ext) => `src/**/*${ext}`),
-    ignores: ['src/**/*'],
     rules: {
-      'import-x/no-nodejs-modules': 'off',
+      'import-x/no-nodejs-modules': 'error',
     },
   },
 
