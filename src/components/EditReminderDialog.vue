@@ -16,15 +16,15 @@
 </template>
 
 <script setup lang="ts">
-import { notification_manager } from '../lib/notifications.ts';
-import { parseRepeat } from '../lib/repeat.ts';
-import { toaster } from '../lib/toaster.ts';
+import AppDialog from '~components/AppDialog.vue';
+import ReminderForm from '~components/ReminderForm.vue';
+import { notification_manager } from '~lib/notifications.ts';
+import { parseRepeat } from '~lib/repeat.ts';
+import { toaster } from '~lib/toaster.ts';
 
-import AppDialog from './AppDialog.vue';
-import ReminderForm from './ReminderForm.vue';
 
-import type { Reminder } from '../lib/db.ts';
-import type { RepeatSpec } from '../lib/repeat.ts';
+import type { Reminder } from '~lib/db.ts';
+import type { RepeatSpec } from '~lib/repeat.ts';
 
 /**
  * Edit dialog for a not-yet-fired reminder: the shared form pre-filled from

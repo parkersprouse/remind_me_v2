@@ -12,10 +12,9 @@ import {
 } from '@tauri-apps/plugin-notification';
 import { ref } from 'vue';
 
-import { useSettingsStore } from '../stores/settings.ts';
 
-import { DB } from './db.ts';
-import { parseDurationString } from './duration.ts';
+import { DB } from '~lib/db.ts';
+import { parseDurationString } from '~lib/duration.ts';
 import {
   isChained,
   nextOccurrence,
@@ -24,9 +23,10 @@ import {
   toSchedule,
   withAnchor,
 
-} from './repeat.ts';
+} from '~lib/repeat.ts';
+import { useSettingsStore } from '~stores/settings.ts';
 
-import type { RepeatSpec } from './repeat.ts';
+import type { RepeatSpec } from '~lib/repeat.ts';
 
 /**
  * Mirrors NotificationManager from the Flutter app.

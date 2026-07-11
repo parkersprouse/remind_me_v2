@@ -44,7 +44,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-import NumberPicker from './NumberPicker.vue';
+import NumberPicker from '~components/NumberPicker.vue';
 
 /**
  * Custom snooze picker, opened when the "Custom…" action on a delivered

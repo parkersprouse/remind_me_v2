@@ -122,6 +122,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
 
+import AppDialog from '~components/AppDialog.vue';
 import {
   clamp,
   formatHex,
@@ -129,13 +130,12 @@ import {
   hsvToRgb,
   parseHex,
   rgbToHsv,
-} from '../lib/color.ts';
-import { contrastingInk } from '../lib/theme.ts';
-import { toaster } from '../lib/toaster.ts';
+} from '~lib/color.ts';
+import { contrastingInk } from '~lib/theme.ts';
+import { toaster } from '~lib/toaster.ts';
 
-import AppDialog from './AppDialog.vue';
 
-import type { Channel, HSV, RGB } from '../lib/color.ts';
+import type { Channel, HSV, RGB } from '~lib/color.ts';
 
 /**
  * In-app accent color picker. Replaces `<input type="color">`, whose platform

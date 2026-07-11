@@ -16,7 +16,7 @@
 </template>
 
 <script setup lang="ts">
-import { toaster, toaster_state } from '../lib/toaster.ts';
+import { toaster, toaster_state } from '~lib/toaster.ts';
 </script>
 
 <style scoped>

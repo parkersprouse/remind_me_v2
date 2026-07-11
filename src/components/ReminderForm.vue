@@ -53,17 +53,17 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
 
-import { durationToMinutes } from '../lib/duration.ts';
-import { formatDate, formatTimeOfDay } from '../lib/format.ts';
-import { useSettingsStore } from '../stores/settings.ts';
 
-import DatePickerDialog from './DatePickerDialog.vue';
-import DetailsInput from './DetailsInput.vue';
-import RepeatEditor from './RepeatEditor.vue';
-import TimePickerDialog from './TimePickerDialog.vue';
+import DatePickerDialog from '~components/DatePickerDialog.vue';
+import DetailsInput from '~components/DetailsInput.vue';
+import RepeatEditor from '~components/RepeatEditor.vue';
+import TimePickerDialog from '~components/TimePickerDialog.vue';
+import { durationToMinutes } from '~lib/duration.ts';
+import { formatDate, formatTimeOfDay } from '~lib/format.ts';
+import { useSettingsStore } from '~stores/settings.ts';
 
-import type { DurationOption } from '../lib/duration.ts';
-import type { RepeatSpec } from '../lib/repeat.ts';
+import type { DurationOption } from '~lib/duration.ts';
+import type { RepeatSpec } from '~lib/repeat.ts';
 
 
 /**

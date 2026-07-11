@@ -19,10 +19,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import { useRouterStore } from '../stores/router.ts';
-
-import NewReminderTab from './NewReminderTab.vue';
-import ReminderListTab from './ReminderListTab.vue';
+import { useRouterStore } from '~stores/router.ts';
+import NewReminderTab from '~views/NewReminderTab.vue';
+import ReminderListTab from '~views/ReminderListTab.vue';
 
 /**
  * Mirrors the Home TabBarView: both tabs stay mounted side by side in a

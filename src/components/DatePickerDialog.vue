@@ -50,7 +50,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-import { formatDate } from '../lib/format.ts';
+import { formatDate } from '~lib/format.ts';
 
 /**
  * Material-style calendar date picker. Selection is constrained to

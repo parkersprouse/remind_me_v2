@@ -118,14 +118,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-import { formatTimeOfDay } from '../lib/format.ts';
-import { describeRepeat, ordinal } from '../lib/repeat.ts';
 
-import LabeledSwitch from './LabeledSwitch.vue';
-import NumberPicker from './NumberPicker.vue';
-import TimePickerDialog from './TimePickerDialog.vue';
+import LabeledSwitch from '~components/LabeledSwitch.vue';
+import NumberPicker from '~components/NumberPicker.vue';
+import TimePickerDialog from '~components/TimePickerDialog.vue';
+import { formatTimeOfDay } from '~lib/format.ts';
+import { describeRepeat, ordinal } from '~lib/repeat.ts';
 
-import type { IntervalUnit, RepeatSpec } from '../lib/repeat.ts';
+import type { IntervalUnit, RepeatSpec } from '~lib/repeat.ts';
 
 /**
  * Repeat rule editor embedded in ReminderForm. Off/on switch; when on, the

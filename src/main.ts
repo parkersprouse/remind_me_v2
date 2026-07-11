@@ -5,11 +5,12 @@ import '@saurl/tauri-plugin-safe-area-insets-css-api';
 import { createPinia } from 'pinia';
 import { createApp } from 'vue';
 
-import App from './App.vue';
+import App from '@/App.vue';
+import { registerAndroidBackHandler } from '~lib/androidBack.ts';
+import { notification_manager } from '~lib/notifications.ts';
+import { useSettingsStore } from '~stores/settings.ts';
+
 import './assets/styles/base.css';
-import { registerAndroidBackHandler } from './lib/androidBack.ts';
-import { notification_manager } from './lib/notifications.ts';
-import { useSettingsStore } from './stores/settings.ts';
 
 // Mirrors the Flutter main(): mount the app first, then run the async
 // initializers (settings, notifications, expired-reminder cleanup).

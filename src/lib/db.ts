@@ -1,6 +1,6 @@
 import Database from '@tauri-apps/plugin-sql';
 
-import { currentTimezone } from './format.ts';
+import { currentTimezone } from '~lib/format.ts';
 
 /** Mirrors the Reminder model + sqflite table from the Flutter app. */
 export interface Reminder {

@@ -44,11 +44,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-import { parseDurationString } from '../lib/duration.ts';
+import NumberPicker from '~components/NumberPicker.vue';
+import { parseDurationString } from '~lib/duration.ts';
 
-import NumberPicker from './NumberPicker.vue';
 
-import type { DurationOption } from '../lib/duration.ts';
+import type { DurationOption } from '~lib/duration.ts';
 
 /**
  * Mirrors the "Modify Option" dialog from the Flutter settings page: a

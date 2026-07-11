@@ -87,14 +87,14 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 
-import AppDialog from '../components/AppDialog.vue';
-import EditReminderDialog from '../components/EditReminderDialog.vue';
-import ReminderListEntry from '../components/ReminderListEntry.vue';
-import { DB } from '../lib/db.ts';
-import { notification_manager, onRemindersChanged } from '../lib/notifications.ts';
-import { useRouterStore } from '../stores/router.ts';
+import AppDialog from '~components/AppDialog.vue';
+import EditReminderDialog from '~components/EditReminderDialog.vue';
+import ReminderListEntry from '~components/ReminderListEntry.vue';
+import { DB } from '~lib/db.ts';
+import { notification_manager, onRemindersChanged } from '~lib/notifications.ts';
+import { useRouterStore } from '~stores/router.ts';
 
-import type { Reminder } from '../lib/db.ts';
+import type { Reminder } from '~lib/db.ts';
 
 /**
  * Mirrors ListTab: reminder list with pull/press-to-refresh, a details dialog

@@ -75,20 +75,20 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
-import BadgedIcon from './components/BadgedIcon.vue';
-import SnoozeDialog from './components/SnoozeDialog.vue';
-import ToasterHost from './components/ToasterHost.vue';
-import { custom_snooze_request, notification_manager, permissions } from './lib/notifications.ts';
-import { applyDynamicColor } from './lib/theme.ts';
-import { toaster } from './lib/toaster.ts';
-import { useRouterStore } from './stores/router.ts';
-import { useSettingsStore } from './stores/settings.ts';
-import HomeView from './views/HomeView.vue';
-import LandingView from './views/LandingView.vue';
-import SettingsView from './views/SettingsView.vue';
+import BadgedIcon from '~components/BadgedIcon.vue';
+import SnoozeDialog from '~components/SnoozeDialog.vue';
+import ToasterHost from '~components/ToasterHost.vue';
+import { custom_snooze_request, notification_manager, permissions } from '~lib/notifications.ts';
+import { applyDynamicColor } from '~lib/theme.ts';
+import { toaster } from '~lib/toaster.ts';
+import { useRouterStore } from '~stores/router.ts';
+import { useSettingsStore } from '~stores/settings.ts';
+import HomeView from '~views/HomeView.vue';
+import LandingView from '~views/LandingView.vue';
+import SettingsView from '~views/SettingsView.vue';
 
-import type { Page } from './stores/router.ts';
 import type { Component } from 'vue';
+import type { Page } from '~stores/router.ts';
 
 declare global {
   interface Window {

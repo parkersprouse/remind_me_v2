@@ -27,10 +27,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-import { formatEpoch } from '../lib/format.ts';
-import { describeRepeat, parseRepeat } from '../lib/repeat.ts';
+import { formatEpoch } from '~lib/format.ts';
+import { describeRepeat, parseRepeat } from '~lib/repeat.ts';
 
-import type { Reminder } from '../lib/db.ts';
+import type { Reminder } from '~lib/db.ts';
 
 /**
  * List entry: tap shows details, long-press (~500ms hold) opens the entry's

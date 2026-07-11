@@ -7,11 +7,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
-import ReminderForm from '../components/ReminderForm.vue';
-import { notification_manager } from '../lib/notifications.ts';
-import { toaster } from '../lib/toaster.ts';
+import ReminderForm from '~components/ReminderForm.vue';
+import { notification_manager } from '~lib/notifications.ts';
+import { toaster } from '~lib/toaster.ts';
 
-import type { RepeatSpec } from '../lib/repeat.ts';
+import type { RepeatSpec } from '~lib/repeat.ts';
 
 /**
  * Mirrors IndexTab: renders the shared reminder form in create mode and

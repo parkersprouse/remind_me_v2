@@ -100,15 +100,15 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
-import AccentColorPicker from '../components/AccentColorPicker.vue';
-import BadgedIcon from '../components/BadgedIcon.vue';
-import DurationEditDialog from '../components/DurationEditDialog.vue';
-import LabeledSwitch from '../components/LabeledSwitch.vue';
-import ThemeSelector from '../components/ThemeSelector.vue';
-import { durationFromElements } from '../lib/duration.ts';
-import { useSettingsStore } from '../stores/settings.ts';
+import AccentColorPicker from '~components/AccentColorPicker.vue';
+import BadgedIcon from '~components/BadgedIcon.vue';
+import DurationEditDialog from '~components/DurationEditDialog.vue';
+import LabeledSwitch from '~components/LabeledSwitch.vue';
+import ThemeSelector from '~components/ThemeSelector.vue';
+import { durationFromElements } from '~lib/duration.ts';
+import { useSettingsStore } from '~stores/settings.ts';
 
-import type { DurationOption } from '../lib/duration.ts';
+import type { DurationOption } from '~lib/duration.ts';
 
 /**
  * Mirrors SettingsPage: theme selector, Quick-Schedule section, and Reminder

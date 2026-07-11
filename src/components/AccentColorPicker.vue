@@ -49,10 +49,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import { contrastingInk, PRESET_ACCENTS } from '../lib/theme.ts';
-import { useSettingsStore } from '../stores/settings.ts';
+import ColorPickerDialog from '~components/ColorPickerDialog.vue';
+import { contrastingInk, PRESET_ACCENTS } from '~lib/theme.ts';
+import { useSettingsStore } from '~stores/settings.ts';
 
-import ColorPickerDialog from './ColorPickerDialog.vue';
 
 /**
  * Seed color for the generated Material palette: a row of curated presets plus
