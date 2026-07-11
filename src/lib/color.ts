@@ -7,14 +7,14 @@
  * HSV is a plain cylinder and maps onto (angle, radius, overlay) exactly.
  */
 
-export interface Rgb {
+export interface RGB {
   /** 0-255, integral. */
   r: number;
   g: number;
   b: number;
 }
 
-export interface Hsv {
+export interface HSV {
   /** Degrees, [0, 360). */
   h: number;
   /** [0, 1] */
@@ -23,7 +23,7 @@ export interface Hsv {
   v: number;
 }
 
-export type Channel = keyof Rgb;
+export type Channel = keyof RGB;
 
 const HEX_PATTERN = /^#?(?:[\da-f]{3}|[\da-f]{6})$/i;
 
@@ -32,7 +32,7 @@ export function clamp(value: number, min: number, max: number): number {
 }
 
 /** Accepts `#abc`, `abc`, `#aabbcc`, `aabbcc`. Null when the text is not a color. */
-export function parseHex(input: string): Rgb | null {
+export function parseHex(input: string): RGB | null {
   const trimmed = input.trim();
   if (!HEX_PATTERN.test(trimmed)) return null;
 
@@ -49,12 +49,12 @@ export function parseHex(input: string): Rgb | null {
   };
 }
 
-export function formatHex({ r, g, b }: Rgb): string {
+export function formatHex({ r, g, b }: RGB): string {
   const digits = [r, g, b].map((channel) => channel.toString(16).padStart(2, '0'));
   return `#${digits.join('')}`;
 }
 
-export function rgbToHsv({ r, g, b }: Rgb): Hsv {
+export function rgbToHsv({ r, g, b }: RGB): HSV {
   const red = r / 255;
   const green = g / 255;
   const blue = b / 255;
@@ -63,7 +63,7 @@ export function rgbToHsv({ r, g, b }: Rgb): Hsv {
   const chroma = value - Math.min(red, green, blue);
 
   // A neutral has no angle to recover; callers that need to keep a hue across
-  // a trip through gray must hold onto their own Hsv rather than re-deriving.
+  // a trip through gray must hold onto their own HSV rather than re-deriving.
   let hue = 0;
   if (chroma !== 0) {
     if (value === red) hue = 60 * ((green - blue) / chroma);
@@ -78,7 +78,7 @@ export function rgbToHsv({ r, g, b }: Rgb): Hsv {
   };
 }
 
-export function hsvToRgb({ h, s, v }: Hsv): Rgb {
+export function hsvToRgb({ h, s, v }: HSV): RGB {
   const hue = ((h % 360) + 360) % 360;
   const chroma = v * s;
   // The channel between the max and the min, falling off linearly across each
@@ -103,6 +103,6 @@ export function hsvToRgb({ h, s, v }: Hsv): Rgb {
   };
 }
 
-export function hsvToHex(hsv: Hsv): string {
+export function hsvToHex(hsv: HSV): string {
   return formatHex(hsvToRgb(hsv));
 }

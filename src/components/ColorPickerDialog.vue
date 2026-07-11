@@ -8,12 +8,11 @@ import {
   hsvToRgb,
   parseHex,
   rgbToHsv,
-  type Channel,
-  type Hsv,
-  type Rgb,
 } from '../lib/color';
 import { contrastingInk } from '../lib/theme';
 import { Toaster } from '../lib/toaster';
+
+import type { Channel, HSV, RGB } from '../lib/color';
 
 /**
  * In-app accent color picker. Replaces `<input type="color">`, whose platform
@@ -47,8 +46,8 @@ const mode = ref<Mode>('wheel');
  * neutral color (chroma 0 has no angle), and re-deriving `rgb` from a rounded
  * `hsv` would drift the value away from the color the dialog opened on.
  */
-const rgb = reactive<Rgb>({ r: 0, g: 0, b: 0 });
-const hsv = reactive<Hsv>({ h: 0, s: 0, v: 0 });
+const rgb = reactive<RGB>({ r: 0, g: 0, b: 0 });
+const hsv = reactive<HSV>({ h: 0, s: 0, v: 0 });
 
 /** Free-text buffer, so a half-typed hex is not rewritten mid-keystroke. */
 const hexDraft = ref('');
@@ -72,13 +71,13 @@ const thumbStyle = computed(() => {
   };
 });
 
-function commitRgb(next: Rgb): void {
+function commitRgb(next: RGB): void {
   Object.assign(rgb, next);
   Object.assign(hsv, rgbToHsv(next));
   hexDraft.value = formatHex(next);
 }
 
-function commitHsv(next: Hsv): void {
+function commitHsv(next: HSV): void {
   Object.assign(hsv, next);
   Object.assign(rgb, hsvToRgb(next));
   hexDraft.value = formatHex(rgb);
@@ -133,15 +132,15 @@ function setChannel(key: Channel, raw: string): void {
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return;
 
-  const next: Rgb = { ...rgb };
+  const next: RGB = { ...rgb };
   next[key] = clamp(Math.round(parsed), 0, 255);
   commitRgb(next);
 }
 
 /** The gradient a channel slider sweeps: this color with that channel 0 -> 255. */
 function channelTrack(key: Channel): string {
-  const low: Rgb = { ...rgb, [key]: 0 };
-  const high: Rgb = { ...rgb, [key]: 255 };
+  const low: RGB = { ...rgb, [key]: 0 };
+  const high: RGB = { ...rgb, [key]: 255 };
   return `linear-gradient(to right, ${formatHex(low)}, ${formatHex(high)})`;
 }
 

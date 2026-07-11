@@ -43,7 +43,7 @@ function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
       </div>
     </section>
 
-    <section class="settings-container">
+    <section v-if='false' class="settings-container">
       <LabeledSwitch
         :model-value="settings.pageTransitions"
         @update:model-value="settings.setPageTransitions($event)"
