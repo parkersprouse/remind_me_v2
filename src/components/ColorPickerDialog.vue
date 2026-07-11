@@ -1,6 +1,127 @@
+<template>
+  <AppDialog :open='open' @dismiss="emit('dismiss')">
+    <template #title>
+      <i class='fa-solid fa-eye-dropper title-icon' aria-hidden='true'/>
+      <span class='text-title-large'>Custom Color</span>
+    </template>
+
+    <div class='picker'>
+      <!-- Doubles as the preview and the readout of the value being edited. -->
+      <div class='preview' :style='{ backgroundColor: hex, color: ink }'>
+        <span class='preview-hex'>{{ hex }}</span>
+        <button
+          type='button'
+          class='copy'
+          :style='{ color: ink }'
+          aria-label='Copy hex value'
+          @click='copyHex'
+        >
+          <i class='fa-regular fa-copy' aria-hidden='true'/>
+        </button>
+      </div>
+
+      <div class='modes' role='tablist' aria-label='Color entry mode'>
+        <button
+          v-for='option in MODES'
+          :key='option.id'
+          type='button'
+          role='tab'
+          :aria-selected='mode === option.id'
+          class='mode'
+          :class='{ selected: mode === option.id }'
+          @click='mode = option.id'
+        >
+          <i :class='option.icon' aria-hidden='true'/>
+          <span>{{ option.label }}</span>
+        </button>
+      </div>
+
+      <div v-if="mode === 'wheel'" class='pane'>
+        <div
+          ref='wheel'
+          class='wheel'
+          role='application'
+          aria-label='Color wheel: angle sets hue, distance from center sets saturation'
+          @pointerdown='startWheelDrag'
+          @pointermove='continueWheelDrag'
+        >
+          <!-- Value is a black veil rather than a third gradient: HSV scales
+               every channel by v, which is exactly what compositing black at
+               1 - v alpha does. -->
+          <div class='wheel-veil' :style='{ opacity: 1 - hsv.v }'/>
+          <div class='wheel-thumb' :style='thumbStyle'/>
+        </div>
+
+        <label class='slider-row'>
+          <span class='slider-label'>Brightness</span>
+          <input
+            type='range'
+            min='0'
+            max='1'
+            step='0.001'
+            :value='hsv.v'
+            :style='{ backgroundImage: valueTrack }'
+            @input='setValue'
+          >
+        </label>
+      </div>
+
+      <div v-else-if="mode === 'rgb'" class='pane'>
+        <label v-for='channel in CHANNELS' :key='channel.key' class='slider-row'>
+          <span class='slider-label'>{{ channel.label }}</span>
+          <input
+            type='range'
+            min='0'
+            max='255'
+            step='1'
+            :value='rgb[channel.key]'
+            :style='{ backgroundImage: channelTrack(channel.key) }'
+            @input='setChannel(channel.key, ($event.target as HTMLInputElement).value)'
+          >
+          <input
+            type='number'
+            class='channel-value'
+            inputmode='numeric'
+            min='0'
+            max='255'
+            :value='rgb[channel.key]'
+            :aria-label='channel.label'
+            @input='setChannel(channel.key, ($event.target as HTMLInputElement).value)'
+          >
+        </label>
+      </div>
+
+      <div v-else class='pane'>
+        <label class='hex-row'>
+          <span class='slider-label'>Hex</span>
+          <input
+            type='text'
+            class='hex-input'
+            :class='{ invalid: !hexDraftValid }'
+            :value='hexDraft'
+            maxlength='7'
+            spellcheck='false'
+            autocapitalize='off'
+            autocomplete='off'
+            aria-label='Hex color value'
+            @input='setHex'
+            @blur='normalizeHex'
+          >
+        </label>
+        <p class='hex-hint'>Three or six digits, with or without the leading #.</p>
+      </div>
+    </div>
+
+    <template #actions>
+      <button type='button' class='btn-text' @click="emit('dismiss')">Cancel</button>
+      <button type='button' class='btn-filled select' @click="emit('save', hex)">Select</button>
+    </template>
+  </AppDialog>
+</template>
+
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
-import AppDialog from './AppDialog.vue';
+
 import {
   clamp,
   formatHex,
@@ -8,9 +129,11 @@ import {
   hsvToRgb,
   parseHex,
   rgbToHsv,
-} from '../lib/color';
-import { contrastingInk } from '../lib/theme';
-import { Toaster } from '../lib/toaster';
+} from '../lib/color.ts';
+import { contrastingInk } from '../lib/theme.ts';
+import { Toaster } from '../lib/toaster.ts';
+
+import AppDialog from './AppDialog.vue';
 
 import type { Channel, HSV, RGB } from '../lib/color';
 
@@ -19,22 +142,56 @@ import type { Channel, HSV, RGB } from '../lib/color';
  * dialog cannot be seeded with the current color and pads itself with its own
  * suggestion swatches (the preset row already plays that role).
  */
-const props = defineProps<{ open: boolean; initial: string }>();
+const props = defineProps<{
+  open: boolean;
+  initial: string;
+}>();
 
-const emit = defineEmits<{ save: [hex: string]; dismiss: [] }>();
+const emit = defineEmits<{
+  save: [hex: string];
+  dismiss: [];
+}>();
 
 type Mode = 'wheel' | 'rgb' | 'hex';
 
-const MODES: { id: Mode; label: string; icon: string }[] = [
-  { id: 'wheel', label: 'Wheel', icon: 'fa-solid fa-circle-half-stroke' },
-  { id: 'rgb', label: 'RGB', icon: 'fa-solid fa-sliders' },
-  { id: 'hex', label: 'Hex', icon: 'fa-solid fa-hashtag' },
+const MODES: {
+  id: Mode;
+  label: string;
+  icon: string;
+}[] = [
+  {
+    id: 'wheel',
+    label: 'Wheel',
+    icon: 'fa-solid fa-circle-half-stroke',
+  },
+  {
+    id: 'rgb',
+    label: 'RGB',
+    icon: 'fa-solid fa-sliders',
+  },
+  {
+    id: 'hex',
+    label: 'Hex',
+    icon: 'fa-solid fa-hashtag',
+  },
 ];
 
-const CHANNELS: { key: Channel; label: string }[] = [
-  { key: 'r', label: 'R' },
-  { key: 'g', label: 'G' },
-  { key: 'b', label: 'B' },
+const CHANNELS: {
+  key: Channel;
+  label: string;
+}[] = [
+  {
+    key: 'r',
+    label: 'R',
+  },
+  {
+    key: 'g',
+    label: 'G',
+  },
+  {
+    key: 'b',
+    label: 'B',
+  },
 ];
 
 const mode = ref<Mode>('wheel');
@@ -46,8 +203,16 @@ const mode = ref<Mode>('wheel');
  * neutral color (chroma 0 has no angle), and re-deriving `rgb` from a rounded
  * `hsv` would drift the value away from the color the dialog opened on.
  */
-const rgb = reactive<RGB>({ r: 0, g: 0, b: 0 });
-const hsv = reactive<HSV>({ h: 0, s: 0, v: 0 });
+const rgb = reactive<RGB>({
+  r: 0,
+  g: 0,
+  b: 0,
+});
+const hsv = reactive<HSV>({
+  h: 0,
+  s: 0,
+  v: 0,
+});
 
 /** Free-text buffer, so a half-typed hex is not rewritten mid-keystroke. */
 const hexDraft = ref('');
@@ -57,9 +222,11 @@ const ink = computed(() => contrastingInk(hex.value));
 const hexDraftValid = computed(() => parseHex(hexDraft.value) !== null);
 
 /** Full-brightness twin of the current color: the top end of the value slider. */
-const valueTrack = computed(
-  () => `linear-gradient(to right, #000000, ${hsvToHex({ h: hsv.h, s: hsv.s, v: 1 })})`,
-);
+const valueTrack = computed(() => `linear-gradient(to right, #000000, ${hsvToHex({
+  h: hsv.h,
+  s: hsv.s,
+  v: 1,
+})})`);
 
 /** Where the wheel thumb sits, in percent of the wheel box. */
 const thumbStyle = computed(() => {
@@ -88,7 +255,11 @@ watch(
   () => props.open,
   (open) => {
     if (!open) return;
-    commitRgb(parseHex(props.initial) ?? { r: 0, g: 0, b: 0 });
+    commitRgb(parseHex(props.initial) ?? {
+      r: 0,
+      g: 0,
+      b: 0,
+    });
     mode.value = 'wheel';
   },
   { immediate: true },
@@ -125,7 +296,11 @@ function continueWheelDrag(event: PointerEvent): void {
 }
 
 function setValue(event: Event): void {
-  commitHsv({ h: hsv.h, s: hsv.s, v: Number((event.target as HTMLInputElement).value) });
+  commitHsv({
+    h: hsv.h,
+    s: hsv.s,
+    v: Number((event.target as HTMLInputElement).value),
+  });
 }
 
 function setChannel(key: Channel, raw: string): void {
@@ -139,8 +314,14 @@ function setChannel(key: Channel, raw: string): void {
 
 /** The gradient a channel slider sweeps: this color with that channel 0 -> 255. */
 function channelTrack(key: Channel): string {
-  const low: RGB = { ...rgb, [key]: 0 };
-  const high: RGB = { ...rgb, [key]: 255 };
+  const low: RGB = {
+    ...rgb,
+    [key]: 0,
+  };
+  const high: RGB = {
+    ...rgb,
+    [key]: 255,
+  };
   return `linear-gradient(to right, ${formatHex(low)}, ${formatHex(high)})`;
 }
 
@@ -178,127 +359,6 @@ async function copyHex(): Promise<void> {
   }
 }
 </script>
-
-<template>
-  <AppDialog :open="open" @dismiss="emit('dismiss')">
-    <template #title>
-      <i class="fa-solid fa-eye-dropper title-icon" aria-hidden="true"></i>
-      <span class="text-title-large">Custom Color</span>
-    </template>
-
-    <div class="picker">
-      <!-- Doubles as the preview and the readout of the value being edited. -->
-      <div class="preview" :style="{ backgroundColor: hex, color: ink }">
-        <span class="preview-hex">{{ hex }}</span>
-        <button
-          type="button"
-          class="copy"
-          :style="{ color: ink }"
-          aria-label="Copy hex value"
-          @click="copyHex"
-        >
-          <i class="fa-regular fa-copy" aria-hidden="true"></i>
-        </button>
-      </div>
-
-      <div class="modes" role="tablist" aria-label="Color entry mode">
-        <button
-          v-for="option in MODES"
-          :key="option.id"
-          type="button"
-          role="tab"
-          :aria-selected="mode === option.id"
-          class="mode"
-          :class="{ selected: mode === option.id }"
-          @click="mode = option.id"
-        >
-          <i :class="option.icon" aria-hidden="true"></i>
-          <span>{{ option.label }}</span>
-        </button>
-      </div>
-
-      <div v-if="mode === 'wheel'" class="pane">
-        <div
-          ref="wheel"
-          class="wheel"
-          role="application"
-          aria-label="Color wheel: angle sets hue, distance from center sets saturation"
-          @pointerdown="startWheelDrag"
-          @pointermove="continueWheelDrag"
-        >
-          <!-- Value is a black veil rather than a third gradient: HSV scales
-               every channel by v, which is exactly what compositing black at
-               1 - v alpha does. -->
-          <div class="wheel-veil" :style="{ opacity: 1 - hsv.v }"></div>
-          <div class="wheel-thumb" :style="thumbStyle"></div>
-        </div>
-
-        <label class="slider-row">
-          <span class="slider-label">Brightness</span>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.001"
-            :value="hsv.v"
-            :style="{ backgroundImage: valueTrack }"
-            @input="setValue"
-          />
-        </label>
-      </div>
-
-      <div v-else-if="mode === 'rgb'" class="pane">
-        <label v-for="channel in CHANNELS" :key="channel.key" class="slider-row">
-          <span class="slider-label">{{ channel.label }}</span>
-          <input
-            type="range"
-            min="0"
-            max="255"
-            step="1"
-            :value="rgb[channel.key]"
-            :style="{ backgroundImage: channelTrack(channel.key) }"
-            @input="setChannel(channel.key, ($event.target as HTMLInputElement).value)"
-          />
-          <input
-            type="number"
-            class="channel-value"
-            inputmode="numeric"
-            min="0"
-            max="255"
-            :value="rgb[channel.key]"
-            :aria-label="channel.label"
-            @input="setChannel(channel.key, ($event.target as HTMLInputElement).value)"
-          />
-        </label>
-      </div>
-
-      <div v-else class="pane">
-        <label class="hex-row">
-          <span class="slider-label">Hex</span>
-          <input
-            type="text"
-            class="hex-input"
-            :class="{ invalid: !hexDraftValid }"
-            :value="hexDraft"
-            maxlength="7"
-            spellcheck="false"
-            autocapitalize="off"
-            autocomplete="off"
-            aria-label="Hex color value"
-            @input="setHex"
-            @blur="normalizeHex"
-          />
-        </label>
-        <p class="hex-hint">Three or six digits, with or without the leading #.</p>
-      </div>
-    </div>
-
-    <template #actions>
-      <button type="button" class="btn-text" @click="emit('dismiss')">Cancel</button>
-      <button type="button" class="btn-filled select" @click="emit('save', hex)">Select</button>
-    </template>
-  </AppDialog>
-</template>
 
 <style scoped>
 .title-icon {

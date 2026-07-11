@@ -1,5 +1,55 @@
+<template>
+  <Teleport to='body'>
+    <Transition name='dialog'>
+      <div v-if='open' class='dialog-scrim' @click.self="emit('dismiss')">
+        <div class='picker-card' role='dialog' aria-modal='true'>
+          <div class='header'>
+            <div class='help text-label-medium'>Select date</div>
+            <div class='selected-date'>{{ formatDate(selected) }}</div>
+          </div>
+
+          <div class='month-nav'>
+            <span class='month-label text-label-medium'>{{ MONTHS[viewMonth] }} {{ viewYear }}</span>
+            <span class='nav-buttons'>
+              <button type='button' :disabled='!canGoBack' aria-label='Previous month' @click='changeMonth(-1)'>
+                <i class='fa-solid fa-chevron-left' aria-hidden='true'/>
+              </button>
+              <button type='button' :disabled='!canGoForward' aria-label='Next month' @click='changeMonth(1)'>
+                <i class='fa-solid fa-chevron-right' aria-hidden='true'/>
+              </button>
+            </span>
+          </div>
+
+          <div class='calendar'>
+            <span v-for='(weekday, i) in WEEKDAYS' :key='`wd-${i}`' class='weekday'>{{ weekday }}</span>
+            <template v-for='(cell, i) in grid' :key='i'>
+              <span v-if='cell === null'/>
+              <button
+                v-else
+                type='button'
+                class='day'
+                :class='{ selected: cell.isSelected, today: cell.isToday }'
+                :disabled='cell.disabled'
+                @click='selected = cell.date'
+              >
+                {{ cell.day }}
+              </button>
+            </template>
+          </div>
+
+          <div class='actions'>
+            <button type='button' class='btn-text' @click="emit('dismiss')">Cancel</button>
+            <button type='button' class='btn-filled confirm' @click='confirm'>Select</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+</template>
+
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+
 import { formatDate } from '../lib/format';
 
 /**
@@ -80,12 +130,8 @@ const grid = computed<(DayCell | null)[]>(() => {
   return cells;
 });
 
-const canGoBack = computed(
-  () => new Date(viewYear.value, viewMonth.value, 1) > new Date(firstDate.value.getFullYear(), firstDate.value.getMonth(), 1),
-);
-const canGoForward = computed(
-  () => new Date(viewYear.value, viewMonth.value, 1) < new Date(lastDate.value.getFullYear(), lastDate.value.getMonth(), 1),
-);
+const canGoBack = computed(() => new Date(viewYear.value, viewMonth.value, 1) > new Date(firstDate.value.getFullYear(), firstDate.value.getMonth(), 1));
+const canGoForward = computed(() => new Date(viewYear.value, viewMonth.value, 1) < new Date(lastDate.value.getFullYear(), lastDate.value.getMonth(), 1));
 
 function changeMonth(delta: number): void {
   const next = new Date(viewYear.value, viewMonth.value + delta, 1);
@@ -98,55 +144,6 @@ function confirm(): void {
   emit('dismiss');
 }
 </script>
-
-<template>
-  <Teleport to="body">
-    <Transition name="dialog">
-      <div v-if="open" class="dialog-scrim" @click.self="emit('dismiss')">
-        <div class="picker-card" role="dialog" aria-modal="true">
-          <div class="header">
-            <div class="help text-label-medium">Select date</div>
-            <div class="selected-date">{{ formatDate(selected) }}</div>
-          </div>
-
-          <div class="month-nav">
-            <span class="month-label text-label-medium">{{ MONTHS[viewMonth] }} {{ viewYear }}</span>
-            <span class="nav-buttons">
-              <button type="button" :disabled="!canGoBack" aria-label="Previous month" @click="changeMonth(-1)">
-                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
-              </button>
-              <button type="button" :disabled="!canGoForward" aria-label="Next month" @click="changeMonth(1)">
-                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
-              </button>
-            </span>
-          </div>
-
-          <div class="calendar">
-            <span v-for="(weekday, i) in WEEKDAYS" :key="`wd-${i}`" class="weekday">{{ weekday }}</span>
-            <template v-for="(cell, i) in grid" :key="i">
-              <span v-if="cell === null"></span>
-              <button
-                v-else
-                type="button"
-                class="day"
-                :class="{ selected: cell.isSelected, today: cell.isToday }"
-                :disabled="cell.disabled"
-                @click="selected = cell.date"
-              >
-                {{ cell.day }}
-              </button>
-            </template>
-          </div>
-
-          <div class="actions">
-            <button type="button" class="btn-text" @click="emit('dismiss')">Cancel</button>
-            <button type="button" class="btn-filled confirm" @click="confirm">Select</button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
-</template>
 
 <style scoped>
 .dialog-scrim {

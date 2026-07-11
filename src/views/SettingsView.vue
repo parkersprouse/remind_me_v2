@@ -1,12 +1,114 @@
+<template>
+  <div class='settings'>
+    <section class='settings-container theme-section'>
+      <ThemeSelector />
+      <div class='accent-divider'>
+        <AccentColorPicker />
+      </div>
+    </section>
+
+    <section v-if='false' class='settings-container'>
+      <LabeledSwitch
+        :model-value='settings.pageTransitions'
+        @update:model-value='settings.setPageTransitions($event)'
+      >
+        <span class='section-title'>
+          <i class='fa-solid fa-arrow-right-arrow-left section-icon plain-icon' aria-hidden='true'/>
+          Page Transitions
+        </span>
+      </LabeledSwitch>
+    </section>
+
+    <section class='settings-container'>
+      <LabeledSwitch
+        :model-value='settings.showQuickSchedule'
+        @update:model-value='settings.setShowQuickSchedule($event)'
+      >
+        <span class='section-title'>
+          <BadgedIcon icon='fa-solid fa-bell' badge='fa-solid fa-bolt' :size='17' class='section-icon' />
+          Quick-Schedule
+        </span>
+      </LabeledSwitch>
+      <div class='option-chips'>
+        <button
+          v-for='(option, index) in settings.quickOptions'
+          :key='`quick-${index}`'
+          type='button'
+          class='chip chip-pill option-chip'
+          @click="edit('quick', index, option)"
+        >
+          <i class='fa-solid fa-pencil chip-avatar edit-icon' aria-hidden='true'/>
+          {{ option.label }}
+        </button>
+      </div>
+    </section>
+
+    <section class='settings-container'>
+      <LabeledSwitch
+        :model-value='settings.showNotifSnooze'
+        @update:model-value='settings.setShowNotifSnooze($event)'
+      >
+        <span class='section-title'>
+          <BadgedIcon icon='fa-solid fa-bell' badge='fa-solid fa-circle-pause' :size='17' class='section-icon' />
+          Reminder Snooze
+        </span>
+      </LabeledSwitch>
+
+      <div class='sub-option'>
+        <LabeledSwitch
+          :model-value='settings.notifSnoozeCustomButton'
+          @update:model-value='settings.setNotifSnoozeCustomButton($event)'
+        >
+          <span class='sub-title'>
+            <i class='fa-regular fa-clock sub-icon' aria-hidden='true'/>
+            Custom duration button
+          </span>
+        </LabeledSwitch>
+      </div>
+
+      <!-- Live preview of the notification's action buttons: the editable
+           presets that fit, plus the fixed "Custom…" action when enabled. -->
+      <div class='option-chips'>
+        <button
+          v-for='(option, index) in settings.visibleSnoozeOptions'
+          :key='`snooze-${index}`'
+          type='button'
+          class='chip chip-pill option-chip'
+          @click="edit('snooze', index, option)"
+        >
+          <i class='fa-solid fa-pencil chip-avatar edit-icon' aria-hidden='true'/>
+          {{ option.label }}
+        </button>
+        <span
+          v-if='settings.notifSnoozeCustomButton'
+          class='chip chip-pill option-chip custom-chip'
+        >
+          <i class='fa-regular fa-clock chip-avatar' aria-hidden='true'/>
+          Custom…
+        </span>
+      </div>
+    </section>
+
+    <DurationEditDialog
+      :option='editing?.option ?? null'
+      @save='saveEdit'
+      @dismiss='editing = null'
+    />
+  </div>
+</template>
+
 <script setup lang="ts">
 import { ref } from 'vue';
+
 import AccentColorPicker from '../components/AccentColorPicker.vue';
 import BadgedIcon from '../components/BadgedIcon.vue';
 import DurationEditDialog from '../components/DurationEditDialog.vue';
 import LabeledSwitch from '../components/LabeledSwitch.vue';
 import ThemeSelector from '../components/ThemeSelector.vue';
-import { durationFromElements, type DurationOption } from '../lib/duration';
+import { durationFromElements } from '../lib/duration';
 import { useSettingsStore } from '../stores/settings';
+
+import type { DurationOption } from '../lib/duration';
 
 /**
  * Mirrors SettingsPage: theme selector, Quick-Schedule section, and Reminder
@@ -16,10 +118,18 @@ const settings = useSettingsStore();
 
 type OptionGroup = 'quick' | 'snooze';
 
-const editing = ref<{ group: OptionGroup; index: number; option: DurationOption } | null>(null);
+const editing = ref<{
+  group: OptionGroup;
+  index: number;
+  option: DurationOption;
+} | null>(null);
 
 function edit(group: OptionGroup, index: number, option: DurationOption): void {
-  editing.value = { group, index, option };
+  editing.value = {
+    group,
+    index,
+    option,
+  };
 }
 
 function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
@@ -33,105 +143,6 @@ function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
   editing.value = null;
 }
 </script>
-
-<template>
-  <div class="settings">
-    <section class="settings-container theme-section">
-      <ThemeSelector />
-      <div class="accent-divider">
-        <AccentColorPicker />
-      </div>
-    </section>
-
-    <section v-if='false' class="settings-container">
-      <LabeledSwitch
-        :model-value="settings.pageTransitions"
-        @update:model-value="settings.setPageTransitions($event)"
-      >
-        <span class="section-title">
-          <i class="fa-solid fa-arrow-right-arrow-left section-icon plain-icon" aria-hidden="true"></i>
-          Page Transitions
-        </span>
-      </LabeledSwitch>
-    </section>
-
-    <section class="settings-container">
-      <LabeledSwitch
-        :model-value="settings.showQuickSchedule"
-        @update:model-value="settings.setShowQuickSchedule($event)"
-      >
-        <span class="section-title">
-          <BadgedIcon icon="fa-solid fa-bell" badge="fa-solid fa-bolt" :size="17" class="section-icon" />
-          Quick-Schedule
-        </span>
-      </LabeledSwitch>
-      <div class="option-chips">
-        <button
-          v-for="(option, index) in settings.quickOptions"
-          :key="`quick-${index}`"
-          type="button"
-          class="chip chip-pill option-chip"
-          @click="edit('quick', index, option)"
-        >
-          <i class="fa-solid fa-pencil chip-avatar edit-icon" aria-hidden="true"></i>
-          {{ option.label }}
-        </button>
-      </div>
-    </section>
-
-    <section class="settings-container">
-      <LabeledSwitch
-        :model-value="settings.showNotifSnooze"
-        @update:model-value="settings.setShowNotifSnooze($event)"
-      >
-        <span class="section-title">
-          <BadgedIcon icon="fa-solid fa-bell" badge="fa-solid fa-circle-pause" :size="17" class="section-icon" />
-          Reminder Snooze
-        </span>
-      </LabeledSwitch>
-
-      <div class="sub-option">
-        <LabeledSwitch
-          :model-value="settings.notifSnoozeCustomButton"
-          @update:model-value="settings.setNotifSnoozeCustomButton($event)"
-        >
-          <span class="sub-title">
-            <i class="fa-regular fa-clock sub-icon" aria-hidden="true"></i>
-            Custom duration button
-          </span>
-        </LabeledSwitch>
-      </div>
-
-      <!-- Live preview of the notification's action buttons: the editable
-           presets that fit, plus the fixed "Custom…" action when enabled. -->
-      <div class="option-chips">
-        <button
-          v-for="(option, index) in settings.visibleSnoozeOptions"
-          :key="`snooze-${index}`"
-          type="button"
-          class="chip chip-pill option-chip"
-          @click="edit('snooze', index, option)"
-        >
-          <i class="fa-solid fa-pencil chip-avatar edit-icon" aria-hidden="true"></i>
-          {{ option.label }}
-        </button>
-        <span
-          v-if="settings.notifSnoozeCustomButton"
-          class="chip chip-pill option-chip custom-chip"
-        >
-          <i class="fa-regular fa-clock chip-avatar" aria-hidden="true"></i>
-          Custom…
-        </span>
-      </div>
-    </section>
-
-    <DurationEditDialog
-      :option="editing?.option ?? null"
-      @save="saveEdit"
-      @dismiss="editing = null"
-    />
-  </div>
-</template>
 
 <style scoped>
 .settings {

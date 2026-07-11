@@ -1,5 +1,49 @@
+<template>
+  <Teleport to='body'>
+    <Transition name='dialog'>
+      <div v-if='request !== null' class='dialog-scrim' @click.self="emit('dismiss')">
+        <div class='snooze-card' role='dialog' aria-modal='true'>
+          <div class='title'>
+            <i class='fa-regular fa-clock title-icon' aria-hidden='true'/>
+            <span class='text-title-large'>Snooze Reminder</span>
+          </div>
+          <div class='divider'/>
+
+          <p v-if='request.details' class='details'>{{ request.details }}</p>
+
+          <div class='controls'>
+            <NumberPicker v-model='value' :min='1' :max='maxValue' />
+            <div class='unit-select'>
+              <button
+                type='button'
+                :class="{ selected: unit === 'minutes' }"
+                @click="unit = 'minutes'"
+              >
+                Minutes
+              </button>
+              <button
+                type='button'
+                :class="{ selected: unit === 'hours' }"
+                @click="unit = 'hours'"
+              >
+                Hours
+              </button>
+            </div>
+          </div>
+
+          <div class='actions'>
+            <button type='button' class='btn-text' @click="emit('dismiss')">Close</button>
+            <button type='button' class='btn-filled save' @click='save'>Snooze</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+</template>
+
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+
 import NumberPicker from './NumberPicker.vue';
 
 /**
@@ -9,7 +53,10 @@ import NumberPicker from './NumberPicker.vue';
  */
 const props = defineProps<{
   /** The reminder being snoozed, or null when closed. */
-  request: { id: number; details: string } | null;
+  request: {
+    id: number;
+    details: string;
+  } | null;
 }>();
 
 const emit = defineEmits<{
@@ -40,49 +87,6 @@ function save(): void {
   emit('save', unit.value === 'hours' ? value.value * 60 : value.value);
 }
 </script>
-
-<template>
-  <Teleport to="body">
-    <Transition name="dialog">
-      <div v-if="request !== null" class="dialog-scrim" @click.self="emit('dismiss')">
-        <div class="snooze-card" role="dialog" aria-modal="true">
-          <div class="title">
-            <i class="fa-regular fa-clock title-icon" aria-hidden="true"></i>
-            <span class="text-title-large">Snooze Reminder</span>
-          </div>
-          <div class="divider"></div>
-
-          <p v-if="request.details" class="details">{{ request.details }}</p>
-
-          <div class="controls">
-            <NumberPicker v-model="value" :min="1" :max="maxValue" />
-            <div class="unit-select">
-              <button
-                type="button"
-                :class="{ selected: unit === 'minutes' }"
-                @click="unit = 'minutes'"
-              >
-                Minutes
-              </button>
-              <button
-                type="button"
-                :class="{ selected: unit === 'hours' }"
-                @click="unit = 'hours'"
-              >
-                Hours
-              </button>
-            </div>
-          </div>
-
-          <div class="actions">
-            <button type="button" class="btn-text" @click="emit('dismiss')">Close</button>
-            <button type="button" class="btn-filled save" @click="save">Snooze</button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
-</template>
 
 <style scoped>
 .dialog-scrim {

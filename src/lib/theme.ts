@@ -4,6 +4,7 @@ import {
   Hct,
   themeFromSourceColor,
 } from '@material/material-color-utilities';
+
 import type { Scheme } from '@material/material-color-utilities';
 
 /**
@@ -22,14 +23,38 @@ export interface AccentPreset {
 export const DEFAULT_ACCENT = '#006496';
 
 export const PRESET_ACCENTS: AccentPreset[] = [
-  { hex: DEFAULT_ACCENT, name: 'Blue' },
-  { hex: '#4355b9', name: 'Indigo' },
-  { hex: '#6750a4', name: 'Violet' },
-  { hex: '#984061', name: 'Magenta' },
-  { hex: '#b3261e', name: 'Red' },
-  { hex: '#8b5000', name: 'Orange' },
-  { hex: '#386a20', name: 'Green' },
-  { hex: '#00696d', name: 'Teal' },
+  {
+    hex: DEFAULT_ACCENT,
+    name: 'Blue',
+  },
+  {
+    hex: '#4355b9',
+    name: 'Indigo',
+  },
+  {
+    hex: '#6750a4',
+    name: 'Violet',
+  },
+  {
+    hex: '#984061',
+    name: 'Magenta',
+  },
+  {
+    hex: '#b3261e',
+    name: 'Red',
+  },
+  {
+    hex: '#8b5000',
+    name: 'Orange',
+  },
+  {
+    hex: '#386a20',
+    name: 'Green',
+  },
+  {
+    hex: '#00696d',
+    name: 'Teal',
+  },
 ];
 
 /**
@@ -82,9 +107,15 @@ const TOKENS: Record<string, (scheme: Scheme) => number> = {
 };
 
 /** Deriving a theme walks six tonal palettes; seeds repeat on every scheme flip. */
-const cache = new Map<string, { light: Scheme; dark: Scheme }>();
+const cache = new Map<string, {
+  light: Scheme;
+  dark: Scheme;
+}>();
 
-function schemesFor(seedHex: string): { light: Scheme; dark: Scheme } {
+function schemesFor(seedHex: string): {
+  light: Scheme;
+  dark: Scheme;
+} {
   const cached = cache.get(seedHex);
   if (cached !== undefined) return cached;
 

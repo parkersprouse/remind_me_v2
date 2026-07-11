@@ -1,6 +1,27 @@
+<template>
+  <div class='theme-selector' role='radiogroup' aria-label='Theme'>
+    <button
+      v-for='segment in segments'
+      :key='segment.value'
+      type='button'
+      role='radio'
+      :aria-checked='settings.theme === segment.value'
+      class='segment'
+      :class='{ selected: settings.theme === segment.value }'
+      @click='settings.setTheme(segment.value)'
+    >
+      <i :class='segment.icon' aria-hidden='true'/>
+      {{ segment.label }}
+    </button>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useSettingsStore, type ThemeMode } from '../stores/settings';
+
+import { useSettingsStore } from '../stores/settings';
+
+import type { ThemeMode } from '../stores/settings';
 
 /**
  * Mirrors ThemeSelector: a Material segmented button for Light/Dark/System.
@@ -8,7 +29,11 @@ import { useSettingsStore, type ThemeMode } from '../stores/settings';
  */
 const settings = useSettingsStore();
 
-const segments = computed<{ value: ThemeMode; label: string; icon: string }[]>(() => [
+const segments = computed<{
+  value: ThemeMode;
+  label: string;
+  icon: string;
+}[]>(() => [
   {
     value: 'light',
     label: 'Light',
@@ -19,27 +44,13 @@ const segments = computed<{ value: ThemeMode; label: string; icon: string }[]>((
     label: 'Dark',
     icon: settings.isDarkMode ? 'fa-regular fa-moon' : 'fa-solid fa-moon',
   },
-  { value: 'system', label: 'System', icon: 'fa-solid fa-circle-half-stroke' },
+  {
+    value: 'system',
+    label: 'System',
+    icon: 'fa-solid fa-circle-half-stroke',
+  },
 ]);
 </script>
-
-<template>
-  <div class="theme-selector" role="radiogroup" aria-label="Theme">
-    <button
-      v-for="segment in segments"
-      :key="segment.value"
-      type="button"
-      role="radio"
-      :aria-checked="settings.theme === segment.value"
-      class="segment"
-      :class="{ selected: settings.theme === segment.value }"
-      @click="settings.setTheme(segment.value)"
-    >
-      <i :class="segment.icon" aria-hidden="true"></i>
-      {{ segment.label }}
-    </button>
-  </div>
-</template>
 
 <style scoped>
 .theme-selector {

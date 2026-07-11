@@ -1,3 +1,162 @@
+<template>
+  <Teleport to='body'>
+    <Transition name='dialog'>
+      <div v-if='open' class='dialog-scrim' @click.self="emit('dismiss')">
+        <div class='picker-card' role='dialog' aria-modal='true'>
+          <div class='help text-label-medium'>Select time</div>
+
+          <div v-if="mode === 'dial'" class='fields'>
+            <button
+              type='button'
+              class='time-display'
+              :class="{ active: stage === 'hour' }"
+              aria-label='Select hour'
+              @click="stage = 'hour'"
+            >
+              {{ dialHour }}
+            </button>
+            <span class='colon'>:</span>
+            <button
+              type='button'
+              class='time-display'
+              :class="{ active: stage === 'minute' }"
+              aria-label='Select minute'
+              @click="stage = 'minute'"
+            >
+              {{ String(dialMinute).padStart(2, '0') }}
+            </button>
+            <span class='meridiem'>
+              <button
+                type='button'
+                :class="{ selected: meridiem === 'AM' }"
+                @click="meridiem = 'AM'"
+              >
+                AM
+              </button>
+              <button
+                type='button'
+                :class="{ selected: meridiem === 'PM' }"
+                @click="meridiem = 'PM'"
+              >
+                PM
+              </button>
+            </span>
+          </div>
+
+          <div v-else class='fields'>
+            <input
+              v-model='hourText'
+              class='time-field'
+              type='text'
+              inputmode='numeric'
+              maxlength='2'
+              aria-label='Hour'
+              @focus='($event.target as HTMLInputElement).select()'
+            >
+            <span class='colon'>:</span>
+            <input
+              v-model='minuteText'
+              class='time-field'
+              type='text'
+              inputmode='numeric'
+              maxlength='2'
+              aria-label='Minute'
+              @focus='($event.target as HTMLInputElement).select()'
+            >
+            <span class='meridiem'>
+              <button
+                type='button'
+                :class="{ selected: meridiem === 'AM' }"
+                @click="meridiem = 'AM'"
+              >
+                AM
+              </button>
+              <button
+                type='button'
+                :class="{ selected: meridiem === 'PM' }"
+                @click="meridiem = 'PM'"
+              >
+                PM
+              </button>
+            </span>
+          </div>
+
+          <div v-if="mode === 'input'" class='field-labels'>
+            <span class='text-label-small'>Hour</span>
+            <span class='text-label-small'>Minute</span>
+          </div>
+
+          <svg
+            v-if="mode === 'dial'"
+            ref='dialEl'
+            class='dial'
+            :viewBox='`0 0 ${SIZE} ${SIZE}`'
+            xmlns='http://www.w3.org/2000/svg'
+            @pointerdown='onDialPointerDown'
+            @pointermove='onDialPointerMove'
+            @pointerup='onDialPointerUp'
+            @pointercancel='onDialPointerCancel'
+          >
+            <circle class='dial-face' :cx='CENTER' :cy='CENTER' :r='CENTER' />
+            <circle class='dial-hand' :cx='CENTER' :cy='CENTER' r='4' />
+            <line
+              class='dial-hand-line'
+              :x1='CENTER'
+              :y1='CENTER'
+              :x2='knob.x'
+              :y2='knob.y'
+            />
+            <circle class='dial-hand' :cx='knob.x' :cy='knob.y' :r='KNOB_R' />
+            <circle v-if='knobDot' class='dial-knob-dot' :cx='knob.x' :cy='knob.y' r='2' />
+            <template v-if="stage === 'hour'">
+              <text
+                v-for='cell in hourCells'
+                :key='cell.value'
+                class='dial-num'
+                :class='{ selected: cell.value === dialHour }'
+                :x='cell.x'
+                :y='cell.y'
+              >
+                {{ cell.label }}
+              </text>
+            </template>
+            <template v-else>
+              <text
+                v-for='cell in minuteCells'
+                :key='cell.value'
+                class='dial-num'
+                :class='{ selected: cell.value === dialMinute }'
+                :x='cell.x'
+                :y='cell.y'
+              >
+                {{ cell.label }}
+              </text>
+            </template>
+          </svg>
+
+          <div class='actions'>
+            <button
+              type='button'
+              class='mode-toggle'
+              :aria-label="mode === 'dial' ? 'Switch to text input' : 'Switch to dial'"
+              @click='toggleMode'
+            >
+              <i
+                :class="mode === 'dial' ? 'fa-regular fa-keyboard' : 'fa-regular fa-clock'"
+                aria-hidden='true'
+              />
+            </button>
+            <button type='button' class='btn-text' @click="emit('dismiss')">Cancel</button>
+            <button type='button' class='btn-filled confirm' :disabled='!isValid' @click='confirm'>
+              Select
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+</template>
+
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
@@ -42,15 +201,13 @@ watch(
 const parsedHour = computed(() => Number.parseInt(hourText.value, 10));
 const parsedMinute = computed(() => Number.parseInt(minuteText.value, 10));
 
-const isValid = computed(
-  () =>
-    Number.isInteger(parsedHour.value) &&
-    parsedHour.value >= 1 &&
-    parsedHour.value <= 12 &&
-    Number.isInteger(parsedMinute.value) &&
-    parsedMinute.value >= 0 &&
-    parsedMinute.value <= 59,
-);
+const isValid = computed(() =>
+  Number.isInteger(parsedHour.value) &&
+  parsedHour.value >= 1 &&
+  parsedHour.value <= 12 &&
+  Number.isInteger(parsedMinute.value) &&
+  parsedMinute.value >= 0 &&
+  parsedMinute.value <= 59);
 
 function confirm(): void {
   if (!isValid.value) return;
@@ -67,19 +224,33 @@ const CENTER = SIZE / 2;
 const NUMBER_R = 100;
 const KNOB_R = 18;
 
-function pos(angleDeg: number, radius: number): { x: number; y: number } {
+function pos(angleDeg: number, radius: number): {
+  x: number;
+  y: number;
+} {
   const rad = (angleDeg * Math.PI) / 180;
-  return { x: CENTER + radius * Math.sin(rad), y: CENTER - radius * Math.cos(rad) };
+  return {
+    x: CENTER + radius * Math.sin(rad),
+    y: CENTER - radius * Math.cos(rad),
+  };
 }
 
 const hourCells = Array.from({ length: 12 }, (_, i) => {
   const value = i + 1;
-  return { value, label: String(value), ...pos(value * 30, NUMBER_R) };
+  return {
+    value,
+    label: String(value),
+    ...pos(value * 30, NUMBER_R),
+  };
 });
 
 const minuteCells = Array.from({ length: 12 }, (_, i) => {
   const value = i * 5;
-  return { value, label: String(value).padStart(2, '0'), ...pos(value * 6, NUMBER_R) };
+  return {
+    value,
+    label: String(value).padStart(2, '0'),
+    ...pos(value * 6, NUMBER_R),
+  };
 });
 
 // The dial always needs a renderable value, even while the text fields hold
@@ -94,8 +265,7 @@ const dialMinute = computed(() => {
 });
 
 const handAngle = computed(() =>
-  stage.value === 'hour' ? (dialHour.value % 12) * 30 : dialMinute.value * 6,
-);
+  stage.value === 'hour' ? (dialHour.value % 12) * 30 : dialMinute.value * 6);
 const knob = computed(() => pos(handAngle.value, NUMBER_R));
 // A minute off the 5-minute marks gets a small dot inside the knob instead of
 // covering a number (standard Material behavior).
@@ -155,165 +325,6 @@ function toggleMode(): void {
   stage.value = 'hour';
 }
 </script>
-
-<template>
-  <Teleport to="body">
-    <Transition name="dialog">
-      <div v-if="open" class="dialog-scrim" @click.self="emit('dismiss')">
-        <div class="picker-card" role="dialog" aria-modal="true">
-          <div class="help text-label-medium">Select time</div>
-
-          <div v-if="mode === 'dial'" class="fields">
-            <button
-              type="button"
-              class="time-display"
-              :class="{ active: stage === 'hour' }"
-              aria-label="Select hour"
-              @click="stage = 'hour'"
-            >
-              {{ dialHour }}
-            </button>
-            <span class="colon">:</span>
-            <button
-              type="button"
-              class="time-display"
-              :class="{ active: stage === 'minute' }"
-              aria-label="Select minute"
-              @click="stage = 'minute'"
-            >
-              {{ String(dialMinute).padStart(2, '0') }}
-            </button>
-            <span class="meridiem">
-              <button
-                type="button"
-                :class="{ selected: meridiem === 'AM' }"
-                @click="meridiem = 'AM'"
-              >
-                AM
-              </button>
-              <button
-                type="button"
-                :class="{ selected: meridiem === 'PM' }"
-                @click="meridiem = 'PM'"
-              >
-                PM
-              </button>
-            </span>
-          </div>
-
-          <div v-else class="fields">
-            <input
-              v-model="hourText"
-              class="time-field"
-              type="text"
-              inputmode="numeric"
-              maxlength="2"
-              aria-label="Hour"
-              @focus="($event.target as HTMLInputElement).select()"
-            />
-            <span class="colon">:</span>
-            <input
-              v-model="minuteText"
-              class="time-field"
-              type="text"
-              inputmode="numeric"
-              maxlength="2"
-              aria-label="Minute"
-              @focus="($event.target as HTMLInputElement).select()"
-            />
-            <span class="meridiem">
-              <button
-                type="button"
-                :class="{ selected: meridiem === 'AM' }"
-                @click="meridiem = 'AM'"
-              >
-                AM
-              </button>
-              <button
-                type="button"
-                :class="{ selected: meridiem === 'PM' }"
-                @click="meridiem = 'PM'"
-              >
-                PM
-              </button>
-            </span>
-          </div>
-
-          <div v-if="mode === 'input'" class="field-labels">
-            <span class="text-label-small">Hour</span>
-            <span class="text-label-small">Minute</span>
-          </div>
-
-          <svg
-            v-if="mode === 'dial'"
-            ref="dialEl"
-            class="dial"
-            :viewBox="`0 0 ${SIZE} ${SIZE}`"
-            xmlns="http://www.w3.org/2000/svg"
-            @pointerdown="onDialPointerDown"
-            @pointermove="onDialPointerMove"
-            @pointerup="onDialPointerUp"
-            @pointercancel="onDialPointerCancel"
-          >
-            <circle class="dial-face" :cx="CENTER" :cy="CENTER" :r="CENTER" />
-            <circle class="dial-hand" :cx="CENTER" :cy="CENTER" r="4" />
-            <line
-              class="dial-hand-line"
-              :x1="CENTER"
-              :y1="CENTER"
-              :x2="knob.x"
-              :y2="knob.y"
-            />
-            <circle class="dial-hand" :cx="knob.x" :cy="knob.y" :r="KNOB_R" />
-            <circle v-if="knobDot" class="dial-knob-dot" :cx="knob.x" :cy="knob.y" r="2" />
-            <template v-if="stage === 'hour'">
-              <text
-                v-for="cell in hourCells"
-                :key="cell.value"
-                class="dial-num"
-                :class="{ selected: cell.value === dialHour }"
-                :x="cell.x"
-                :y="cell.y"
-              >
-                {{ cell.label }}
-              </text>
-            </template>
-            <template v-else>
-              <text
-                v-for="cell in minuteCells"
-                :key="cell.value"
-                class="dial-num"
-                :class="{ selected: cell.value === dialMinute }"
-                :x="cell.x"
-                :y="cell.y"
-              >
-                {{ cell.label }}
-              </text>
-            </template>
-          </svg>
-
-          <div class="actions">
-            <button
-              type="button"
-              class="mode-toggle"
-              :aria-label="mode === 'dial' ? 'Switch to text input' : 'Switch to dial'"
-              @click="toggleMode"
-            >
-              <i
-                :class="mode === 'dial' ? 'fa-regular fa-keyboard' : 'fa-regular fa-clock'"
-                aria-hidden="true"
-              ></i>
-            </button>
-            <button type="button" class="btn-text" @click="emit('dismiss')">Cancel</button>
-            <button type="button" class="btn-filled confirm" :disabled="!isValid" @click="confirm">
-              Select
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
-</template>
 
 <style scoped>
 .dialog-scrim {

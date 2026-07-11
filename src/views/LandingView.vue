@@ -1,6 +1,28 @@
+<template>
+  <div class='landing'>
+    <p class='text-body-large'>
+      Remind Me! requires permission to send you notifications in order to help you schedule your
+      reminders.
+    </p>
+    <p class='text-body-large second'>
+      You may either allow Remind Me! to send you notifications, or exit the app.
+    </p>
+
+    <button v-if='denied' type='button' class='btn-filled' @click='openSettings'>
+      Open Notification Settings
+    </button>
+    <button v-else type='button' class='btn-filled' @click='requestPermission'>
+      Allow Notifications
+    </button>
+
+    <button type='button' class='btn-text exit' @click='exitApp'>Exit App</button>
+  </div>
+</template>
+
 <script setup lang="ts">
-import { ref } from 'vue';
 import { exit } from '@tauri-apps/plugin-process';
+import { ref } from 'vue';
+
 import { Permissions } from '../lib/notifications';
 import { useRouterStore } from '../stores/router';
 
@@ -19,7 +41,7 @@ declare global {
      * this app's Android notification settings so the user can re-enable
      * notifications after denying them.
      */
-    AndroidNative?: { openNotificationSettings: () => void };
+    AndroidNative?: { openNotificationSettings: () => void; };
   }
 }
 
@@ -39,27 +61,6 @@ async function exitApp(): Promise<void> {
   await exit(0);
 }
 </script>
-
-<template>
-  <div class="landing">
-    <p class="text-body-large">
-      Remind Me! requires permission to send you notifications in order to help you schedule your
-      reminders.
-    </p>
-    <p class="text-body-large second">
-      You may either allow Remind Me! to send you notifications, or exit the app.
-    </p>
-
-    <button v-if="denied" type="button" class="btn-filled" @click="openSettings">
-      Open Notification Settings
-    </button>
-    <button v-else type="button" class="btn-filled" @click="requestPermission">
-      Allow Notifications
-    </button>
-
-    <button type="button" class="btn-text exit" @click="exitApp">Exit App</button>
-  </div>
-</template>
 
 <style scoped>
 .landing {

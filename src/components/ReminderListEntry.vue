@@ -1,7 +1,35 @@
+<template>
+  <div
+    class='entry'
+    @pointerdown='onPointerDown'
+    @pointermove='onPointerMove'
+    @pointerup='onPointerEnd'
+    @pointercancel='onPointerEnd'
+    @click='onClick'
+    @contextmenu.prevent
+  >
+    <div class='details-line'>
+      <i class='fa-regular fa-pen-to-square icon' aria-hidden='true'/>
+      <span class='details-text'>{{ reminder.details }}</span>
+    </div>
+    <div class='meta-line'>
+      <i
+        :class="repeatSpec ? 'fa-solid fa-repeat icon' : 'fa-regular fa-clock icon'"
+        aria-hidden='true'
+      />
+      <span>{{
+        repeatSpec ? describeRepeat(repeatSpec) : formatEpoch(reminder.scheduledForEpochMillis)
+      }}</span>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed } from 'vue';
+
 import { formatEpoch } from '../lib/format';
 import { describeRepeat, parseRepeat } from '../lib/repeat';
+
 import type { Reminder } from '../lib/db';
 
 /**
@@ -9,7 +37,7 @@ import type { Reminder } from '../lib/db';
  * context menu (edit/delete). Movement past a small threshold — a scroll or
  * tab swipe — cancels the pending long-press.
  */
-const props = defineProps<{ reminder: Reminder }>();
+const props = defineProps<{ reminder: Reminder; }>();
 
 const emit = defineEmits<{
   showDetails: [reminder: Reminder];
@@ -67,32 +95,6 @@ function onClick(): void {
   emit('showDetails', props.reminder);
 }
 </script>
-
-<template>
-  <div
-    class="entry"
-    @pointerdown="onPointerDown"
-    @pointermove="onPointerMove"
-    @pointerup="onPointerEnd"
-    @pointercancel="onPointerEnd"
-    @click="onClick"
-    @contextmenu.prevent
-  >
-    <div class="details-line">
-      <i class="fa-regular fa-pen-to-square icon" aria-hidden="true"></i>
-      <span class="details-text">{{ reminder.details }}</span>
-    </div>
-    <div class="meta-line">
-      <i
-        :class="repeatSpec ? 'fa-solid fa-repeat icon' : 'fa-regular fa-clock icon'"
-        aria-hidden="true"
-      ></i>
-      <span>{{
-        repeatSpec ? describeRepeat(repeatSpec) : formatEpoch(reminder.scheduledForEpochMillis)
-      }}</span>
-    </div>
-  </div>
-</template>
 
 <style scoped>
 .entry {

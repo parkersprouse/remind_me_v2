@@ -20,27 +20,31 @@ import { Schedule, ScheduleEvery } from '@tauri-apps/plugin-notification';
 export type IntervalUnit = 'minutes' | 'hours' | 'days' | 'weeks' | 'months';
 
 export type RepeatSpec =
-  | { kind: 'interval'; count: number; unit: IntervalUnit }
   | {
-      kind: 'weekly';
-      every: number;
-      /** 1 = Sunday .. 7 = Saturday (plugin DateMatch convention) */
-      weekday: number;
-      hour: number;
-      minute: number;
-      /** Epoch millis of the first occurrence; set when scheduled. */
-      anchor?: number;
-    }
-  | {
-      kind: 'monthly';
-      every: number;
-      /** 1-28 — capped so every month has the day (the plugin's Calendar
+    kind: 'interval';
+    count: number;
+    unit: IntervalUnit;
+  } |
+  {
+    kind: 'weekly';
+    every: number;
+    /** 1 = Sunday .. 7 = Saturday (plugin DateMatch convention) */
+    weekday: number;
+    hour: number;
+    minute: number;
+    /** Epoch millis of the first occurrence; set when scheduled. */
+    anchor?: number;
+  } |
+  {
+    kind: 'monthly';
+    every: number;
+    /** 1-28 — capped so every month has the day (the plugin's Calendar
        *  arithmetic is lenient and would roll "Feb 31" into March). */
-      day: number;
-      hour: number;
-      minute: number;
-      anchor?: number;
-    };
+    day: number;
+    hour: number;
+    minute: number;
+    anchor?: number;
+  };
 
 export const WEEKDAY_NAMES = [
   'Sunday',
@@ -63,7 +67,7 @@ const INTERVAL_UNIT_TO_EVERY: Record<IntervalUnit, ScheduleEvery> = {
 // Matches the plugin's getIntervalTime() approximations (month = 30 days) so
 // the stored next-occurrence epoch agrees with when the OS will actually fire.
 const INTERVAL_UNIT_MILLIS: Record<IntervalUnit, number> = {
-  minutes: 60_000,
+  minutes: 60000,
   hours: 3_600_000,
   days: 86_400_000,
   weeks: 604_800_000,
@@ -101,7 +105,10 @@ export function ordinal(n: number): string {
   return `${n}th`;
 }
 
-const timeFormatter = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+const timeFormatter = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: '2-digit',
+});
 
 function formatRuleTime(hour: number, minute: number): string {
   const d = new Date();
@@ -131,7 +138,7 @@ export function describeRepeat(spec: RepeatSpec): string {
 }
 
 /** Next weekday/time match strictly after `after`. */
-function nextWeeklyMatch(spec: Extract<RepeatSpec, { kind: 'weekly' }>, after: Date): Date {
+function nextWeeklyMatch(spec: Extract<RepeatSpec, { kind: 'weekly'; }>, after: Date): Date {
   const d = new Date(after);
   d.setHours(spec.hour, spec.minute, 0, 0);
   // JS getDay() is 0=Sunday; the spec uses 1=Sunday
@@ -142,7 +149,7 @@ function nextWeeklyMatch(spec: Extract<RepeatSpec, { kind: 'weekly' }>, after: D
 }
 
 /** Next day-of-month/time match strictly after `after` (day is always 1-28). */
-function nextMonthlyMatch(spec: Extract<RepeatSpec, { kind: 'monthly' }>, after: Date): Date {
+function nextMonthlyMatch(spec: Extract<RepeatSpec, { kind: 'monthly'; }>, after: Date): Date {
   let d = new Date(after.getFullYear(), after.getMonth(), spec.day, spec.hour, spec.minute);
   if (d.getTime() <= after.getTime()) {
     d = new Date(after.getFullYear(), after.getMonth() + 1, spec.day, spec.hour, spec.minute);
@@ -156,7 +163,7 @@ function nextMonthlyMatch(spec: Extract<RepeatSpec, { kind: 'monthly' }>, after:
  * wall-clock time survives DST shifts.
  */
 function nextChainedOccurrence(
-  spec: Extract<RepeatSpec, { kind: 'weekly' | 'monthly' }>,
+  spec: Extract<RepeatSpec, { kind: 'weekly' | 'monthly'; }>,
   after: Date,
 ): Date {
   const anchorEpoch = spec.anchor;
@@ -196,7 +203,10 @@ export function nextOccurrence(spec: RepeatSpec, after: Date): Date {
 export function withAnchor(spec: RepeatSpec, from: Date): RepeatSpec {
   if (!isChained(spec) || spec.kind === 'interval') return spec;
   if (spec.anchor !== undefined) return spec;
-  return { ...spec, anchor: nextOccurrence(spec, from).getTime() };
+  return {
+    ...spec,
+    anchor: nextOccurrence(spec, from).getTime(),
+  };
 }
 
 export interface RepeatSchedule {
@@ -219,7 +229,11 @@ export function toSchedule(spec: RepeatSpec, from: Date): RepeatSchedule {
       if (spec.every === 1) {
         return {
           schedule: Schedule.interval(
-            { weekday: spec.weekday, hour: spec.hour, minute: spec.minute },
+            {
+              weekday: spec.weekday,
+              hour: spec.hour,
+              minute: spec.minute,
+            },
             true,
           ),
           nextEpochMillis: nextWeeklyMatch(spec, from).getTime(),
@@ -227,18 +241,30 @@ export function toSchedule(spec: RepeatSpec, from: Date): RepeatSchedule {
         };
       }
       const next = nextChainedOccurrence(spec, from);
-      return { schedule: Schedule.at(next, false, true), nextEpochMillis: next.getTime(), chained: true };
+      return {
+        schedule: Schedule.at(next, false, true),
+        nextEpochMillis: next.getTime(),
+        chained: true,
+      };
     }
     case 'monthly': {
       if (spec.every === 1) {
         return {
-          schedule: Schedule.interval({ day: spec.day, hour: spec.hour, minute: spec.minute }, true),
+          schedule: Schedule.interval({
+            day: spec.day,
+            hour: spec.hour,
+            minute: spec.minute,
+          }, true),
           nextEpochMillis: nextMonthlyMatch(spec, from).getTime(),
           chained: false,
         };
       }
       const next = nextChainedOccurrence(spec, from);
-      return { schedule: Schedule.at(next, false, true), nextEpochMillis: next.getTime(), chained: true };
+      return {
+        schedule: Schedule.at(next, false, true),
+        nextEpochMillis: next.getTime(),
+        chained: true,
+      };
     }
   }
 }

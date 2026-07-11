@@ -1,7 +1,10 @@
-import { defineStore } from 'pinia';
 import { LazyStore } from '@tauri-apps/plugin-store';
-import { packageDurations, type DurationOption } from '../lib/duration';
+import { defineStore } from 'pinia';
+
+import { packageDurations } from '../lib/duration';
 import { DEFAULT_ACCENT } from '../lib/theme';
+
+import type { DurationOption } from '../lib/duration';
 
 // Android renders at most three notification action buttons.
 const MAX_NOTIF_ACTIONS = 3;

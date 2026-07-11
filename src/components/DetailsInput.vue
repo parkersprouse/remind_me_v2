@@ -1,3 +1,22 @@
+<template>
+  <div class='details-input' :class='{ focused }'>
+    <label class='floating-label' for='reminder-details'>Reminder Details</label>
+    <div class='field'>
+      <i class='fa-regular fa-pen-to-square prefix' aria-hidden='true'/>
+      <textarea
+        id='reminder-details'
+        v-model='model'
+        :maxlength='MAX_LENGTH'
+        rows='5'
+        placeholder='What would you like to be reminded of?'
+        @focus='focused = true'
+        @blur='focused = false'
+      />
+    </div>
+    <div class='counter text-label-small'>{{ model.length }}/{{ MAX_LENGTH }}</div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { ref } from 'vue';
 
@@ -10,25 +29,6 @@ const MAX_LENGTH = 240;
 const model = defineModel<string>({ required: true });
 const focused = ref(false);
 </script>
-
-<template>
-  <div class="details-input" :class="{ focused }">
-    <label class="floating-label" for="reminder-details">Reminder Details</label>
-    <div class="field">
-      <i class="fa-regular fa-pen-to-square prefix" aria-hidden="true"></i>
-      <textarea
-        id="reminder-details"
-        v-model="model"
-        :maxlength="MAX_LENGTH"
-        rows="5"
-        placeholder="What would you like to be reminded of?"
-        @focus="focused = true"
-        @blur="focused = false"
-      ></textarea>
-    </div>
-    <div class="counter text-label-small">{{ model.length }}/{{ MAX_LENGTH }}</div>
-  </div>
-</template>
 
 <style scoped>
 .details-input {

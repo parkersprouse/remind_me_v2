@@ -1,36 +1,36 @@
+<template>
+  <div
+    class='labeled-switch'
+    role='switch'
+    :aria-checked='modelValue'
+    tabindex='0'
+    @click='toggle'
+    @keydown.enter.prevent='toggle'
+    @keydown.space.prevent='toggle'
+  >
+    <span class='label'><slot /></span>
+    <span class='switch' :class='{ on: modelValue }'>
+      <span class='thumb'>
+        <i :class="modelValue ? 'fa-solid fa-check' : 'fa-solid fa-xmark'" aria-hidden='true'/>
+      </span>
+    </span>
+  </div>
+</template>
+
 <script setup lang="ts">
 /**
  * Mirrors LabeledSwitch from the Flutter app: a row with a label on the left
  * and a Material switch (check/x thumb icons) on the right. Tapping anywhere
  * on the row toggles.
  */
-const props = defineProps<{ modelValue: boolean }>();
+const props = defineProps<{ modelValue: boolean; }>();
 
-const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
+const emit = defineEmits<{ 'update:modelValue': [value: boolean]; }>();
 
 function toggle(): void {
   emit('update:modelValue', !props.modelValue);
 }
 </script>
-
-<template>
-  <div
-    class="labeled-switch"
-    role="switch"
-    :aria-checked="modelValue"
-    tabindex="0"
-    @click="toggle"
-    @keydown.enter.prevent="toggle"
-    @keydown.space.prevent="toggle"
-  >
-    <span class="label"><slot /></span>
-    <span class="switch" :class="{ on: modelValue }">
-      <span class="thumb">
-        <i :class="modelValue ? 'fa-solid fa-check' : 'fa-solid fa-xmark'" aria-hidden="true"></i>
-      </span>
-    </span>
-  </div>
-</template>
 
 <style scoped>
 .labeled-switch {

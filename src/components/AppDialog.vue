@@ -1,33 +1,33 @@
-<script setup lang="ts">
-/**
- * Material AlertDialog equivalent: centered card over a scrim, dismissed by
- * clicking the scrim (barrierDismissible: true in the Flutter app).
- */
-defineProps<{ open: boolean }>();
-
-const emit = defineEmits<{ dismiss: [] }>();
-</script>
-
 <template>
-  <Teleport to="body">
-    <Transition name="dialog">
-      <div v-if="open" class="dialog-scrim" @click.self="emit('dismiss')">
-        <div class="dialog-card" role="dialog" aria-modal="true">
-          <div v-if="$slots.title" class="dialog-title">
-            <slot name="title" />
+  <Teleport to='body'>
+    <Transition name='dialog'>
+      <div v-if='open' class='dialog-scrim' @click.self="emit('dismiss')">
+        <div class='dialog-card' role='dialog' aria-modal='true'>
+          <div v-if='$slots.title' class='dialog-title'>
+            <slot name='title' />
           </div>
-          <div class="dialog-divider"></div>
-          <div class="dialog-content">
+          <div class='dialog-divider'/>
+          <div class='dialog-content'>
             <slot />
           </div>
-          <div v-if="$slots.actions" class="dialog-actions">
-            <slot name="actions" />
+          <div v-if='$slots.actions' class='dialog-actions'>
+            <slot name='actions' />
           </div>
         </div>
       </div>
     </Transition>
   </Teleport>
 </template>
+
+<script setup lang="ts">
+/**
+ * Material AlertDialog equivalent: centered card over a scrim, dismissed by
+ * clicking the scrim (barrierDismissible: true in the Flutter app).
+ */
+defineProps<{ open: boolean; }>();
+
+const emit = defineEmits<{ dismiss: []; }>();
+</script>
 
 <style scoped>
 .dialog-scrim {

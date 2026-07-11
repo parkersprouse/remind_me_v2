@@ -1,4 +1,5 @@
 import Database from '@tauri-apps/plugin-sql';
+
 import { currentTimezone } from './format';
 
 /** Mirrors the Reminder model + sqflite table from the Flutter app. */
@@ -21,17 +22,17 @@ async function db(): Promise<Database> {
 }
 
 interface ReminderStore {
-  insert(
+  insert: (
     id: number,
     details: string,
     scheduledForEpochMillis: number,
     zone?: string,
     repeat?: string | null,
-  ): Promise<void>;
-  getAll(): Promise<Reminder[]>;
-  getById(id: number): Promise<Reminder | null>;
-  getExpired(epochMillis: number): Promise<Reminder[]>;
-  remove(id: number): Promise<void>;
+  ) => Promise<void>;
+  getAll: () => Promise<Reminder[]>;
+  getById: (id: number) => Promise<Reminder | null>;
+  getExpired: (epochMillis: number) => Promise<Reminder[]>;
+  remove: (id: number) => Promise<void>;
 }
 
 export const DB: ReminderStore = {
@@ -49,9 +50,7 @@ export const DB: ReminderStore = {
   },
 
   async getAll(): Promise<Reminder[]> {
-    return (await db()).select<Reminder[]>(
-      'SELECT * FROM reminders ORDER BY scheduledForEpochMillis ASC',
-    );
+    return (await db()).select<Reminder[]>('SELECT * FROM reminders ORDER BY scheduledForEpochMillis ASC');
   },
 
   async getById(id: number): Promise<Reminder | null> {

@@ -1,4 +1,3 @@
-import { ref } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import {
   requestPermission,
@@ -11,6 +10,10 @@ import {
   Visibility,
   Schedule,
 } from '@tauri-apps/plugin-notification';
+import { ref } from 'vue';
+
+import { useSettingsStore } from '../stores/settings';
+
 import { DB } from './db';
 import { parseDurationString } from './duration';
 import {
@@ -20,9 +23,10 @@ import {
   serializeRepeat,
   toSchedule,
   withAnchor,
-  type RepeatSpec,
+
 } from './repeat';
-import { useSettingsStore } from '../stores/settings';
+
+import type { RepeatSpec } from './repeat';
 
 /**
  * Mirrors NotificationManager from the Flutter app.
@@ -32,7 +36,7 @@ import { useSettingsStore } from '../stores/settings';
  * fire whether or not the app is running.
  */
 
-const MAX_INT = 0x7fffffff;
+const MAX_INT = 0x7F_FF_FF_FF;
 const SNOOZE_PREFIX = 'snooze_';
 const CUSTOM_SNOOZE_ACTION_ID = 'snooze_custom';
 const ACTION_TYPE_ID = 'reminder_actions';
@@ -55,7 +59,10 @@ const recentlyExpired = new Map<number, string>();
  * Set when the "Custom…" snooze action is tapped on a delivered notification;
  * App.vue watches this and presents the custom snooze dialog.
  */
-export const customSnoozeRequest = ref<{ id: number; details: string } | null>(null);
+export const customSnoozeRequest = ref<{
+  id: number;
+  details: string;
+} | null>(null);
 
 declare global {
   interface Window {
@@ -75,7 +82,10 @@ async function handleNotificationAction(id: number, actionId: string): Promise<v
 
   if (actionId === CUSTOM_SNOOZE_ACTION_ID) {
     const details = (await DB.getById(id))?.details ?? recentlyExpired.get(id) ?? '';
-    customSnoozeRequest.value = { id, details };
+    customSnoozeRequest.value = {
+      id,
+      details,
+    };
     return;
   }
 
@@ -214,7 +224,7 @@ export const NotificationManager = {
     // A one-shot moves; a repeating reminder keeps its rule and spawns a
     // one-shot copy instead (cancelling it would kill the recurrence).
     if (reminder !== null && reminder.repeat === null) await NotificationManager.cancel(id);
-    const dateTime = new Date(Date.now() + minutes * 60_000);
+    const dateTime = new Date(Date.now() + minutes * 60000);
     await NotificationManager.schedule(dateTime, details, reminder?.timezone);
   },
 
@@ -260,9 +270,9 @@ async function arm(
   // one-shot Schedule.at) use an exact alarm; native repeats map to the
   // plugin's interval/every schedules.
   const schedule =
-    repeat === null
-      ? Schedule.at(dateTime, false, true) // allowWhileIdle so the alarm fires even in Doze
-      : toSchedule(repeat, new Date()).schedule;
+    repeat === null ?
+      Schedule.at(dateTime, false, true) : // allowWhileIdle so the alarm fires even in Doze
+      toSchedule(repeat, new Date()).schedule;
 
   // Invoked directly rather than through sendNotification(): the
   // window.Notification shim it wraps is fire-and-forget, so backend
@@ -339,10 +349,16 @@ async function registerSnoozeActions(): Promise<string | null> {
     title: `+ ${option.label}`,
   }));
   if (settings.notifSnoozeCustomButton) {
-    actions.push({ id: CUSTOM_SNOOZE_ACTION_ID, title: 'Custom…' });
+    actions.push({
+      id: CUSTOM_SNOOZE_ACTION_ID,
+      title: 'Custom…',
+    });
   }
 
-  await registerActionTypes([{ id: ACTION_TYPE_ID, actions }]);
+  await registerActionTypes([{
+    id: ACTION_TYPE_ID,
+    actions,
+  }]);
   return ACTION_TYPE_ID;
 }
 

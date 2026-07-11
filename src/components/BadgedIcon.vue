@@ -1,3 +1,12 @@
+<template>
+  <span class='badged-icon' :style='{ fontSize: `${size}px` }'>
+    <i :class='icon' aria-hidden='true'/>
+    <span v-if='badge' class='badge'>
+      <i :class='badge' aria-hidden='true'/>
+    </span>
+  </span>
+</template>
+
 <script setup lang="ts">
 /**
  * A Font Awesome icon with a small circular badge icon at its bottom-right.
@@ -10,18 +19,12 @@ withDefaults(
     badge?: string;
     size?: number;
   }>(),
-  { badge: undefined, size: 24 },
+  {
+    badge: undefined,
+    size: 24,
+  },
 );
 </script>
-
-<template>
-  <span class="badged-icon" :style="{ fontSize: `${size}px` }">
-    <i :class="icon" aria-hidden="true"></i>
-    <span v-if="badge" class="badge">
-      <i :class="badge" aria-hidden="true"></i>
-    </span>
-  </span>
-</template>
 
 <style scoped>
 .badged-icon {

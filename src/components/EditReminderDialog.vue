@@ -1,19 +1,39 @@
+<template>
+  <AppDialog :open='reminder !== null' @dismiss="emit('dismiss')">
+    <template #title>
+      <i class='fa-regular fa-pen-to-square title-icon' aria-hidden='true'/>
+      <span>Edit Reminder</span>
+    </template>
+    <ReminderForm
+      v-if='reminder'
+      mode='edit'
+      :initial-details='reminder.details'
+      :initial-date-time='new Date(reminder.scheduledForEpochMillis)'
+      :initial-repeat='parseRepeat(reminder.repeat)'
+      @submit='save'
+    />
+  </AppDialog>
+</template>
+
 <script setup lang="ts">
+import { NotificationManager } from '../lib/notifications';
+import { parseRepeat } from '../lib/repeat';
+import { Toaster } from '../lib/toaster';
+
 import AppDialog from './AppDialog.vue';
 import ReminderForm from './ReminderForm.vue';
-import { NotificationManager } from '../lib/notifications';
-import { parseRepeat, type RepeatSpec } from '../lib/repeat';
-import { Toaster } from '../lib/toaster';
+
 import type { Reminder } from '../lib/db';
+import type { RepeatSpec } from '../lib/repeat';
 
 /**
  * Edit dialog for a not-yet-fired reminder: the shared form pre-filled from
  * the reminder, saved in place under the same id (the pending notification is
  * cancelled and re-armed at the new time).
  */
-const props = defineProps<{ reminder: Reminder | null }>();
+const props = defineProps<{ reminder: Reminder | null; }>();
 
-const emit = defineEmits<{ dismiss: [] }>();
+const emit = defineEmits<{ dismiss: []; }>();
 
 async function save(details: string, dateTime: Date, repeat: RepeatSpec | null): Promise<void> {
   const target = props.reminder;
@@ -37,23 +57,6 @@ async function save(details: string, dateTime: Date, repeat: RepeatSpec | null):
   emit('dismiss');
 }
 </script>
-
-<template>
-  <AppDialog :open="reminder !== null" @dismiss="emit('dismiss')">
-    <template #title>
-      <i class="fa-regular fa-pen-to-square title-icon" aria-hidden="true"></i>
-      <span>Edit Reminder</span>
-    </template>
-    <ReminderForm
-      v-if="reminder"
-      mode="edit"
-      :initial-details="reminder.details"
-      :initial-date-time="new Date(reminder.scheduledForEpochMillis)"
-      :initial-repeat="parseRepeat(reminder.repeat)"
-      @submit="save"
-    />
-  </AppDialog>
-</template>
 
 <style scoped>
 .title-icon {

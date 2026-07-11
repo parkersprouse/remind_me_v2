@@ -39,7 +39,12 @@ export function packageDurations(options: string[]): DurationOption[] {
   return options.map((raw) => {
     const [hours, minutes] = parseDurationString(raw);
     const label = minutes > 0 ? `${minutes} min.` : `${hours} hr${hours > 1 ? 's' : ''}.`;
-    return { label, raw, hours, minutes };
+    return {
+      label,
+      raw,
+      hours,
+      minutes,
+    };
   });
 }
 

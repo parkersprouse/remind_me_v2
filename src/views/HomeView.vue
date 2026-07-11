@@ -1,8 +1,28 @@
+<template>
+  <div
+    ref='home'
+    class='home'
+    :class='{ dragging }'
+    @pointerdown='onPointerDown'
+    @pointermove='onPointerMove'
+    @pointerup='onPointerUp'
+    @pointercancel='onPointerCancel'
+    @click.capture='onClickCapture'
+  >
+    <div class='track' :style='trackStyle'>
+      <NewReminderTab class='tab-page' />
+      <ReminderListTab class='tab-page' />
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+
+import { useRouterStore } from '../stores/router';
+
 import NewReminderTab from './NewReminderTab.vue';
 import ReminderListTab from './ReminderListTab.vue';
-import { useRouterStore } from '../stores/router';
 
 /**
  * Mirrors the Home TabBarView: both tabs stay mounted side by side in a
@@ -50,10 +70,16 @@ let tracking = false; // pointer is down but the gesture is unclassified
 let didDrag = false; // suppresses the click that follows a drag
 
 /** Recent pointer positions inside VELOCITY_WINDOW_MS, oldest first. */
-let samples: { t: number; x: number }[] = [];
+let samples: {
+  t: number;
+  x: number;
+}[] = [];
 
 function pushSample(event: PointerEvent): void {
-  samples.push({ t: event.timeStamp, x: event.clientX });
+  samples.push({
+    t: event.timeStamp,
+    x: event.clientX,
+  });
   while (samples.length > 1 && event.timeStamp - samples[0].t > VELOCITY_WINDOW_MS) {
     samples.shift();
   }
@@ -79,7 +105,10 @@ function onPointerDown(event: PointerEvent): void {
   startY = event.clientY;
   tracking = true;
   didDrag = false;
-  samples = [{ t: event.timeStamp, x: event.clientX }];
+  samples = [{
+    t: event.timeStamp,
+    x: event.clientX,
+  }];
 }
 
 function onPointerMove(event: PointerEvent): void {
@@ -154,24 +183,6 @@ const trackStyle = computed(() => ({
   transform: `translateX(calc(${-router.homeTab * 100}% + ${dragOffset.value}px))`,
 }));
 </script>
-
-<template>
-  <div
-    ref="home"
-    class="home"
-    :class="{ dragging }"
-    @pointerdown="onPointerDown"
-    @pointermove="onPointerMove"
-    @pointerup="onPointerUp"
-    @pointercancel="onPointerCancel"
-    @click.capture="onClickCapture"
-  >
-    <div class="track" :style="trackStyle">
-      <NewReminderTab class="tab-page" />
-      <ReminderListTab class="tab-page" />
-    </div>
-  </div>
-</template>
 
 <style scoped>
 .home {

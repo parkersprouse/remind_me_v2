@@ -38,9 +38,9 @@ export function parseHex(input: string): RGB | null {
 
   const digits = trimmed.replace('#', '');
   const full =
-    digits.length === 3
-      ? digits.replace(/./g, (digit) => digit + digit)
-      : digits;
+    digits.length === 3 ?
+      digits.replace(/./g, (digit) => digit + digit) :
+      digits;
 
   return {
     r: Number.parseInt(full.slice(0, 2), 16),

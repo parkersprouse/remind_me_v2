@@ -1,16 +1,94 @@
+<template>
+  <div class='app-shell' :class="{ 'no-tab-bar': router.page !== 'home' }">
+    <header class='app-bar'>
+      <button
+        v-if="router.page === 'settings'"
+        type='button'
+        class='icon-button'
+        aria-label='Back'
+        @click="router.goTo('home')"
+      >
+        <i class='fa-solid fa-arrow-left' aria-hidden='true'/>
+      </button>
+      <span class='title text-title-large'>{{ pageTitle }}</span>
+      <span class='actions'>
+        <button
+          v-if='isDev'
+          type='button'
+          class='icon-button'
+          aria-label='Send test notification'
+          @click='debugNotification'
+        >
+          <i class='fa-solid fa-message' aria-hidden='true'/>
+        </button>
+        <button
+          v-if="router.page === 'home'"
+          type='button'
+          class='icon-button'
+          aria-label='Settings'
+          @click="router.goTo('settings')"
+        >
+          <i class='fa-solid fa-gear' aria-hidden='true'/>
+        </button>
+      </span>
+    </header>
+
+    <!-- IndexedStack equivalent: KeepAlive caches every page's state while
+         Transition slides the outgoing and incoming pages past each other -->
+    <main class='content'>
+      <Transition :name='pageTransitionName'>
+        <KeepAlive>
+          <component :is='pageComponents[router.page]' :key='router.page' class='page' />
+        </KeepAlive>
+      </Transition>
+    </main>
+
+    <nav v-if="router.page === 'home'" class='tab-bar'>
+      <button
+        type='button'
+        class='tab'
+        :class='{ active: router.homeTab === 0 }'
+        @click='router.setTab(0)'
+      >
+        <BadgedIcon icon='fa-solid fa-bell' badge='fa-solid fa-circle-plus' :size='22' />
+        <span>New Reminder</span>
+        <span class='indicator' aria-hidden='true'/>
+      </button>
+      <button
+        type='button'
+        class='tab'
+        :class='{ active: router.homeTab === 1 }'
+        @click='router.setTab(1)'
+      >
+        <i class='fa-solid fa-list-ul tab-icon' aria-hidden='true'/>
+        <span>Scheduled Reminders</span>
+        <span class='indicator' aria-hidden='true'/>
+      </button>
+    </nav>
+
+    <SnoozeDialog :request='customSnoozeRequest' @save='snoozeCustom' @dismiss='dismissSnooze' />
+
+    <ToasterHost />
+  </div>
+</template>
+
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, type Component } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+
 import BadgedIcon from './components/BadgedIcon.vue';
 import SnoozeDialog from './components/SnoozeDialog.vue';
 import ToasterHost from './components/ToasterHost.vue';
-import LandingView from './views/LandingView.vue';
-import HomeView from './views/HomeView.vue';
-import SettingsView from './views/SettingsView.vue';
 import { customSnoozeRequest, NotificationManager, Permissions } from './lib/notifications';
 import { applyDynamicColor } from './lib/theme';
 import { Toaster } from './lib/toaster';
-import { useRouterStore, type Page } from './stores/router';
+import { useRouterStore } from './stores/router';
 import { useSettingsStore } from './stores/settings';
+import HomeView from './views/HomeView.vue';
+import LandingView from './views/LandingView.vue';
+import SettingsView from './views/SettingsView.vue';
+
+import type { Page } from './stores/router';
+import type { Component } from 'vue';
 
 declare global {
   interface Window {
@@ -37,7 +115,11 @@ const pageComponents: Record<Page, Component> = {
 };
 
 /** Depth of each page in the navigation flow, used to pick a slide direction. */
-const pageOrder: Record<Page, number> = { landing: 0, home: 1, settings: 2 };
+const pageOrder: Record<Page, number> = {
+  landing: 0,
+  home: 1,
+  settings: 2,
+};
 
 const slideDirection = ref<'slide-left' | 'slide-right'>('slide-left');
 
@@ -53,8 +135,7 @@ watch(
 // With page transitions disabled, fall back to a name with no CSS rules:
 // Vue finds no transition styles and swaps the pages instantly.
 const pageTransitionName = computed(() =>
-  settings.pageTransitions ? slideDirection.value : 'page-swap-off',
-);
+  settings.pageTransitions ? slideDirection.value : 'page-swap-off');
 
 // Theme handling: data-theme drives color-scheme and the static fallback in
 // theme.css, while the accent seed regenerates the Material palette on top of
@@ -135,80 +216,6 @@ async function snoozeCustom(minutes: number): Promise<void> {
   });
 }
 </script>
-
-<template>
-  <div class="app-shell" :class="{ 'no-tab-bar': router.page !== 'home' }">
-    <header class="app-bar">
-      <button
-        v-if="router.page === 'settings'"
-        type="button"
-        class="icon-button"
-        aria-label="Back"
-        @click="router.goTo('home')"
-      >
-        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
-      </button>
-      <span class="title text-title-large">{{ pageTitle }}</span>
-      <span class="actions">
-        <button
-          v-if="isDev"
-          type="button"
-          class="icon-button"
-          aria-label="Send test notification"
-          @click="debugNotification"
-        >
-          <i class="fa-solid fa-message" aria-hidden="true"></i>
-        </button>
-        <button
-          v-if="router.page === 'home'"
-          type="button"
-          class="icon-button"
-          aria-label="Settings"
-          @click="router.goTo('settings')"
-        >
-          <i class="fa-solid fa-gear" aria-hidden="true"></i>
-        </button>
-      </span>
-    </header>
-
-    <!-- IndexedStack equivalent: KeepAlive caches every page's state while
-         Transition slides the outgoing and incoming pages past each other -->
-    <main class="content">
-      <Transition :name="pageTransitionName">
-        <KeepAlive>
-          <component :is="pageComponents[router.page]" :key="router.page" class="page" />
-        </KeepAlive>
-      </Transition>
-    </main>
-
-    <nav v-if="router.page === 'home'" class="tab-bar">
-      <button
-        type="button"
-        class="tab"
-        :class="{ active: router.homeTab === 0 }"
-        @click="router.setTab(0)"
-      >
-        <BadgedIcon icon="fa-solid fa-bell" badge="fa-solid fa-circle-plus" :size="22" />
-        <span>New Reminder</span>
-        <span class="indicator" aria-hidden="true"></span>
-      </button>
-      <button
-        type="button"
-        class="tab"
-        :class="{ active: router.homeTab === 1 }"
-        @click="router.setTab(1)"
-      >
-        <i class="fa-solid fa-list-ul tab-icon" aria-hidden="true"></i>
-        <span>Scheduled Reminders</span>
-        <span class="indicator" aria-hidden="true"></span>
-      </button>
-    </nav>
-
-    <SnoozeDialog :request="customSnoozeRequest" @save="snoozeCustom" @dismiss="dismissSnooze" />
-
-    <ToasterHost />
-  </div>
-</template>
 
 <style scoped>
 .app-shell {

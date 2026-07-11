@@ -1,3 +1,22 @@
+<template>
+  <div class='number-picker'>
+    <div ref='listEl' class='wheel' @scroll='onScroll'>
+      <div class='spacer'/>
+      <button
+        v-for='value in values()'
+        :key='value'
+        type='button'
+        class='item'
+        :class='{ selected: value === modelValue }'
+        @click='select(value)'
+      >
+        {{ value }}
+      </button>
+      <div class='spacer'/>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 
@@ -12,7 +31,7 @@ const props = defineProps<{
   max: number;
 }>();
 
-const emit = defineEmits<{ 'update:modelValue': [value: number] }>();
+const emit = defineEmits<{ 'update:modelValue': [value: number]; }>();
 
 const ITEM_HEIGHT = 36;
 
@@ -54,7 +73,7 @@ function select(value: number): void {
   scrollToValue(value, true);
 }
 
-onMounted(() => scrollToValue(props.modelValue));
+onMounted(() => { scrollToValue(props.modelValue); });
 
 watch(
   () => [props.min, props.max],
@@ -75,25 +94,6 @@ watch(
   },
 );
 </script>
-
-<template>
-  <div class="number-picker">
-    <div ref="listEl" class="wheel" @scroll="onScroll">
-      <div class="spacer"></div>
-      <button
-        v-for="value in values()"
-        :key="value"
-        type="button"
-        class="item"
-        :class="{ selected: value === modelValue }"
-        @click="select(value)"
-      >
-        {{ value }}
-      </button>
-      <div class="spacer"></div>
-    </div>
-  </div>
-</template>
 
 <style scoped>
 .number-picker {

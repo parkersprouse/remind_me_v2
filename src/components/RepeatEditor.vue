@@ -1,10 +1,131 @@
+<template>
+  <div class='repeat-editor'>
+    <LabeledSwitch v-model='enabled'>
+      <span class='switch-label'>
+        <i class='fa-solid fa-repeat' aria-hidden='true'/>
+        Repeat
+      </span>
+    </LabeledSwitch>
+
+    <div v-if='enabled' class='controls'>
+      <div class='type-select'>
+        <button
+          type='button'
+          class='chip chip-pill'
+          :class="{ selected: type === 'interval' }"
+          @click="type = 'interval'"
+        >
+          Every…
+        </button>
+        <button
+          type='button'
+          class='chip chip-pill'
+          :class="{ selected: type === 'calendar' }"
+          @click="type = 'calendar'"
+        >
+          On a schedule
+        </button>
+      </div>
+
+      <div v-if="type === 'interval'" class='interval-controls'>
+        <NumberPicker v-model='count' :min='1' :max='99' />
+        <div class='unit-select'>
+          <button
+            v-for='u in UNITS'
+            :key='u'
+            type='button'
+            :class='{ selected: unit === u }'
+            @click='unit = u'
+          >
+            {{ u.charAt(0).toUpperCase() + u.slice(1) }}
+          </button>
+        </div>
+      </div>
+
+      <div v-else class='calendar-controls'>
+        <div class='row-select'>
+          <button
+            type='button'
+            class='chip chip-pill'
+            :class="{ selected: calKind === 'weekly' }"
+            @click="calKind = 'weekly'"
+          >
+            Weekly
+          </button>
+          <button
+            type='button'
+            class='chip chip-pill'
+            :class="{ selected: calKind === 'monthly' }"
+            @click="calKind = 'monthly'"
+          >
+            Monthly
+          </button>
+        </div>
+
+        <div class='row-select multiplier-row' role='group' aria-label='Repeat cycle'>
+          <button
+            v-for='m in MULTIPLIERS'
+            :key='m'
+            type='button'
+            class='cycle'
+            :class='{ selected: every === m }'
+            @click='every = m'
+          >
+            {{ m === 1 ? 'Every' : ordinal(m) }}
+          </button>
+        </div>
+
+        <div v-if="calKind === 'weekly'" class='row-select weekday-row' role='group' aria-label='Weekday'>
+          <button
+            v-for='(letter, i) in WEEKDAY_LETTERS'
+            :key='i'
+            type='button'
+            class='weekday'
+            :class='{ selected: weekday === i + 1 }'
+            :aria-label='`Weekday ${i + 1}`'
+            @click='weekday = i + 1'
+          >
+            {{ letter }}
+          </button>
+        </div>
+
+        <div v-else class='day-row'>
+          <span class='day-label'>Day of month</span>
+          <NumberPicker v-model='day' :min='1' :max='28' />
+        </div>
+
+        <div class='time-row'>
+          <button type='button' class='chip' title='Repeat Time' @click='showTimePicker = true'>
+            <i class='fa-regular fa-clock chip-avatar' aria-hidden='true'/>
+            {{ formatTimeOfDay(hour, minute) }}
+          </button>
+        </div>
+      </div>
+
+      <div class='summary text-label-small'>{{ summary }}</div>
+    </div>
+
+    <TimePickerDialog
+      :open='showTimePicker'
+      :hour='hour'
+      :minute='minute'
+      @select='(h, m) => { hour = h; minute = m; }'
+      @dismiss='showTimePicker = false'
+    />
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+
+import { formatTimeOfDay } from '../lib/format';
+import { describeRepeat, ordinal } from '../lib/repeat';
+
 import LabeledSwitch from './LabeledSwitch.vue';
 import NumberPicker from './NumberPicker.vue';
 import TimePickerDialog from './TimePickerDialog.vue';
-import { formatTimeOfDay } from '../lib/format';
-import { describeRepeat, ordinal, type IntervalUnit, type RepeatSpec } from '../lib/repeat';
+
+import type { IntervalUnit, RepeatSpec } from '../lib/repeat';
 
 /**
  * Repeat rule editor embedded in ReminderForm. Off/on switch; when on, the
@@ -52,7 +173,11 @@ if (initial !== null) {
 
 function buildSpec(): RepeatSpec {
   if (type.value === 'interval') {
-    return { kind: 'interval', count: count.value, unit: unit.value };
+    return {
+      kind: 'interval',
+      count: count.value,
+      unit: unit.value,
+    };
   }
   if (calKind.value === 'weekly') {
     return {
@@ -85,123 +210,6 @@ watch([type, count, unit, calKind, every, weekday, day, hour, minute], () => {
 
 const summary = computed(() => (model.value === null ? '' : describeRepeat(model.value)));
 </script>
-
-<template>
-  <div class="repeat-editor">
-    <LabeledSwitch v-model="enabled">
-      <span class="switch-label">
-        <i class="fa-solid fa-repeat" aria-hidden="true"></i>
-        Repeat
-      </span>
-    </LabeledSwitch>
-
-    <div v-if="enabled" class="controls">
-      <div class="type-select">
-        <button
-          type="button"
-          class="chip chip-pill"
-          :class="{ selected: type === 'interval' }"
-          @click="type = 'interval'"
-        >
-          Every…
-        </button>
-        <button
-          type="button"
-          class="chip chip-pill"
-          :class="{ selected: type === 'calendar' }"
-          @click="type = 'calendar'"
-        >
-          On a schedule
-        </button>
-      </div>
-
-      <div v-if="type === 'interval'" class="interval-controls">
-        <NumberPicker v-model="count" :min="1" :max="99" />
-        <div class="unit-select">
-          <button
-            v-for="u in UNITS"
-            :key="u"
-            type="button"
-            :class="{ selected: unit === u }"
-            @click="unit = u"
-          >
-            {{ u.charAt(0).toUpperCase() + u.slice(1) }}
-          </button>
-        </div>
-      </div>
-
-      <div v-else class="calendar-controls">
-        <div class="row-select">
-          <button
-            type="button"
-            class="chip chip-pill"
-            :class="{ selected: calKind === 'weekly' }"
-            @click="calKind = 'weekly'"
-          >
-            Weekly
-          </button>
-          <button
-            type="button"
-            class="chip chip-pill"
-            :class="{ selected: calKind === 'monthly' }"
-            @click="calKind = 'monthly'"
-          >
-            Monthly
-          </button>
-        </div>
-
-        <div class="row-select multiplier-row" role="group" aria-label="Repeat cycle">
-          <button
-            v-for="m in MULTIPLIERS"
-            :key="m"
-            type="button"
-            class="cycle"
-            :class="{ selected: every === m }"
-            @click="every = m"
-          >
-            {{ m === 1 ? 'Every' : ordinal(m) }}
-          </button>
-        </div>
-
-        <div v-if="calKind === 'weekly'" class="row-select weekday-row" role="group" aria-label="Weekday">
-          <button
-            v-for="(letter, i) in WEEKDAY_LETTERS"
-            :key="i"
-            type="button"
-            class="weekday"
-            :class="{ selected: weekday === i + 1 }"
-            :aria-label="`Weekday ${i + 1}`"
-            @click="weekday = i + 1"
-          >
-            {{ letter }}
-          </button>
-        </div>
-
-        <div v-else class="day-row">
-          <span class="day-label">Day of month</span>
-          <NumberPicker v-model="day" :min="1" :max="28" />
-        </div>
-
-        <div class="time-row">
-          <button type="button" class="chip" title="Repeat Time" @click="showTimePicker = true">
-            <i class="fa-regular fa-clock chip-avatar" aria-hidden="true"></i>
-            {{ formatTimeOfDay(hour, minute) }}
-          </button>
-        </div>
-      </div>
-
-      <div class="summary text-label-small">{{ summary }}</div>
-    </div>
-
-    <TimePickerDialog
-      :open="showTimePicker"
-      :hour="hour"
-      :minute="minute"
-      @select="(h, m) => { hour = h; minute = m; }"
-      @dismiss="showTimePicker = false"
-    />
-  </div>
-</template>
 
 <style scoped>
 .repeat-editor {

@@ -1,23 +1,23 @@
-<script setup lang="ts">
-import { Toaster, toasterState } from '../lib/toaster';
-</script>
-
 <template>
-  <Transition name="toast">
-    <div v-if="toasterState.current" class="toast">
+  <Transition name='toast'>
+    <div v-if='toasterState.current' class='toast'>
       <i
-        v-if="toasterState.current.icon"
-        :class="toasterState.current.icon"
+        v-if='toasterState.current.icon'
+        :class='toasterState.current.icon'
         :style="{ color: toasterState.current.iconColor ?? 'var(--dark-primary)' }"
-        aria-hidden="true"
-      ></i>
-      <span class="message">{{ toasterState.current.message }}</span>
-      <button type="button" class="close" aria-label="Close" @click="Toaster.dismiss()">
-        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        aria-hidden='true'
+      />
+      <span class='message'>{{ toasterState.current.message }}</span>
+      <button type='button' class='close' aria-label='Close' @click='Toaster.dismiss()'>
+        <i class='fa-solid fa-xmark' aria-hidden='true'/>
       </button>
     </div>
   </Transition>
 </template>
+
+<script setup lang="ts">
+import { Toaster, toasterState } from '../lib/toaster';
+</script>
 
 <style scoped>
 /* Always dark-scheme colored, matching the Flutter Toaster */

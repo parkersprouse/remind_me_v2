@@ -9,9 +9,6 @@ import vue from 'eslint-plugin-vue';
 import globals from 'globals';
 import { configs as typescript_configs } from 'typescript-eslint';
 
-// @ts-ignore
-// const __dirname = import.meta.dirname;
-
 const js_exts = Object.freeze(['.cjs', '.js', '.mjs']);
 const ts_exts = Object.freeze(['.cts', '.ts', '.mts']);
 const vue_exts = Object.freeze(['.vue']);
@@ -75,7 +72,6 @@ export default defineConfigWithVueTs(
           ts: '@typescript-eslint/parser',
         },
         sourceType: 'module',
-        // tsconfigRootDir: __dirname,
       },
     },
     plugins: {

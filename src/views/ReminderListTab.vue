@@ -1,12 +1,100 @@
+<template>
+  <div class='list-tab'>
+    <div v-if='loading' class='center-state'>
+      <span class='spinner' aria-label='Loading'/>
+    </div>
+
+    <div v-else-if='reminders.length === 0' class='center-state empty'>
+      <i class='fa-regular fa-bell-slash empty-icon' aria-hidden='true'/>
+      <div class='empty-text text-headline-small'>No Reminders Scheduled</div>
+    </div>
+
+    <div v-else class='entries'>
+      <ReminderListEntry
+        v-for='reminder in reminders'
+        :key='reminder.id'
+        :reminder='reminder'
+        @show-details='detailsFor = $event'
+        @long-press='menuFor = $event'
+      />
+    </div>
+
+    <!-- Reminder details dialog (tap on an entry) -->
+    <AppDialog :open='detailsFor !== null' @dismiss='detailsFor = null'>
+      <template #title>
+        <i class='fa-regular fa-pen-to-square title-icon' aria-hidden='true'/>
+        <span>Reminder Details</span>
+      </template>
+      <p class='details-body'>{{ detailsFor?.details }}</p>
+      <template #actions>
+        <button
+          type='button'
+          class='icon-btn'
+          aria-label='Edit Reminder'
+          @click='openEdit(detailsFor!)'
+        >
+          <i class='fa-regular fa-pen-to-square' aria-hidden='true'/>
+        </button>
+        <button
+          type='button'
+          class='icon-btn icon-btn-delete'
+          aria-label='Delete Reminder'
+          @click='requestDelete(detailsFor!)'
+        >
+          <i class='fa-regular fa-trash-can' aria-hidden='true'/>
+        </button>
+        <span class='actions-spacer'/>
+        <button type='button' class='btn-text' @click='detailsFor = null'>Close</button>
+      </template>
+    </AppDialog>
+
+    <!-- Context menu (long-press on an entry) -->
+    <AppDialog :open='menuFor !== null' @dismiss='menuFor = null'>
+      <template #title>
+        <span class='menu-title'>{{ menuFor?.details }}</span>
+      </template>
+      <div class='menu-items'>
+        <button type='button' class='menu-item' @click='openEdit(menuFor!)'>
+          <i class='fa-regular fa-pen-to-square' aria-hidden='true'/>
+          <span>Edit</span>
+        </button>
+        <button type='button' class='menu-item menu-item-delete' @click='requestDelete(menuFor!)'>
+          <i class='fa-regular fa-trash-can' aria-hidden='true'/>
+          <span>Delete</span>
+        </button>
+      </div>
+    </AppDialog>
+
+    <!-- Edit reminder dialog -->
+    <EditReminderDialog :reminder='editFor' @dismiss='editFor = null' />
+
+    <!-- Confirm deletion dialog -->
+    <AppDialog :open='deleteFor !== null' @dismiss='deleteFor = null'>
+      <template #title>
+        <i class='fa-solid fa-circle-exclamation error-icon' aria-hidden='true'/>
+        <span>Confirm Deletion</span>
+      </template>
+      <p>Are you sure you want to delete this Reminder?</p>
+      <p class='warning'>This cannot be undone!</p>
+      <template #actions>
+        <button type='button' class='btn-text' @click='deleteFor = null'>No</button>
+        <button type='button' class='btn-text delete-confirm' @click='confirmDelete'>Yes</button>
+      </template>
+    </AppDialog>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue';
+
 import AppDialog from '../components/AppDialog.vue';
 import EditReminderDialog from '../components/EditReminderDialog.vue';
 import ReminderListEntry from '../components/ReminderListEntry.vue';
-import { NotificationManager, onRemindersChanged } from '../lib/notifications';
-import type { Reminder } from '../lib/db';
 import { DB } from '../lib/db';
+import { NotificationManager, onRemindersChanged } from '../lib/notifications';
 import { useRouterStore } from '../stores/router';
+
+import type { Reminder } from '../lib/db';
 
 /**
  * Mirrors ListTab: reminder list with pull/press-to-refresh, a details dialog
@@ -76,92 +164,6 @@ watch(
 
 defineExpose({ refresh: getReminders });
 </script>
-
-<template>
-  <div class="list-tab">
-    <div v-if="loading" class="center-state">
-      <span class="spinner" aria-label="Loading"></span>
-    </div>
-
-    <div v-else-if="reminders.length === 0" class="center-state empty">
-      <i class="fa-regular fa-bell-slash empty-icon" aria-hidden="true"></i>
-      <div class="empty-text text-headline-small">No Reminders Scheduled</div>
-    </div>
-
-    <div v-else class="entries">
-      <ReminderListEntry
-        v-for="reminder in reminders"
-        :key="reminder.id"
-        :reminder="reminder"
-        @show-details="detailsFor = $event"
-        @long-press="menuFor = $event"
-      />
-    </div>
-
-    <!-- Reminder details dialog (tap on an entry) -->
-    <AppDialog :open="detailsFor !== null" @dismiss="detailsFor = null">
-      <template #title>
-        <i class="fa-regular fa-pen-to-square title-icon" aria-hidden="true"></i>
-        <span>Reminder Details</span>
-      </template>
-      <p class="details-body">{{ detailsFor?.details }}</p>
-      <template #actions>
-        <button
-          type="button"
-          class="icon-btn"
-          aria-label="Edit Reminder"
-          @click="openEdit(detailsFor!)"
-        >
-          <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
-        </button>
-        <button
-          type="button"
-          class="icon-btn icon-btn-delete"
-          aria-label="Delete Reminder"
-          @click="requestDelete(detailsFor!)"
-        >
-          <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
-        </button>
-        <span class="actions-spacer"></span>
-        <button type="button" class="btn-text" @click="detailsFor = null">Close</button>
-      </template>
-    </AppDialog>
-
-    <!-- Context menu (long-press on an entry) -->
-    <AppDialog :open="menuFor !== null" @dismiss="menuFor = null">
-      <template #title>
-        <span class="menu-title">{{ menuFor?.details }}</span>
-      </template>
-      <div class="menu-items">
-        <button type="button" class="menu-item" @click="openEdit(menuFor!)">
-          <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
-          <span>Edit</span>
-        </button>
-        <button type="button" class="menu-item menu-item-delete" @click="requestDelete(menuFor!)">
-          <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
-          <span>Delete</span>
-        </button>
-      </div>
-    </AppDialog>
-
-    <!-- Edit reminder dialog -->
-    <EditReminderDialog :reminder="editFor" @dismiss="editFor = null" />
-
-    <!-- Confirm deletion dialog -->
-    <AppDialog :open="deleteFor !== null" @dismiss="deleteFor = null">
-      <template #title>
-        <i class="fa-solid fa-circle-exclamation error-icon" aria-hidden="true"></i>
-        <span>Confirm Deletion</span>
-      </template>
-      <p>Are you sure you want to delete this Reminder?</p>
-      <p class="warning">This cannot be undone!</p>
-      <template #actions>
-        <button type="button" class="btn-text" @click="deleteFor = null">No</button>
-        <button type="button" class="btn-text delete-confirm" @click="confirmDelete">Yes</button>
-      </template>
-    </AppDialog>
-  </div>
-</template>
 
 <style scoped>
 .list-tab {

@@ -1,8 +1,58 @@
+<template>
+  <div class='accent-picker'>
+    <span class='label text-label-medium'>Accent Color</span>
+
+    <div class='swatches' role='radiogroup' aria-label='Accent color'>
+      <button
+        v-for='preset in PRESET_ACCENTS'
+        :key='preset.hex'
+        type='button'
+        role='radio'
+        :aria-checked='selected === preset.hex.toLowerCase()'
+        :aria-label='preset.name'
+        class='swatch'
+        :class='{ selected: selected === preset.hex.toLowerCase() }'
+        :style='{ backgroundColor: preset.hex, color: contrastingInk(preset.hex) }'
+        @click='pick(preset.hex)'
+      >
+        <i
+          v-if='selected === preset.hex.toLowerCase()'
+          class='fa-solid fa-check'
+          aria-hidden='true'
+        />
+      </button>
+
+      <button
+        type='button'
+        role='radio'
+        :aria-checked='!isPreset'
+        aria-label='Custom accent color'
+        class='swatch custom'
+        :class='{ selected: !isPreset }'
+        :style='isPreset ? undefined : { backgroundColor: selected, color: contrastingInk(selected) }'
+        @click='customOpen = true'
+      >
+        <i v-if='isPreset' class='fa-solid fa-eye-dropper' aria-hidden='true'/>
+        <i v-else class='fa-solid fa-check' aria-hidden='true'/>
+      </button>
+    </div>
+
+    <ColorPickerDialog
+      :open='customOpen'
+      :initial='selected'
+      @save='saveCustom'
+      @dismiss='customOpen = false'
+    />
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import ColorPickerDialog from './ColorPickerDialog.vue';
+
 import { contrastingInk, PRESET_ACCENTS } from '../lib/theme';
 import { useSettingsStore } from '../stores/settings';
+
+import ColorPickerDialog from './ColorPickerDialog.vue';
 
 /**
  * Seed color for the generated Material palette: a row of curated presets plus
@@ -16,8 +66,7 @@ const settings = useSettingsStore();
 const selected = computed(() => settings.accentColor.toLowerCase());
 
 const isPreset = computed(() =>
-  PRESET_ACCENTS.some((preset) => preset.hex.toLowerCase() === selected.value),
-);
+  PRESET_ACCENTS.some((preset) => preset.hex.toLowerCase() === selected.value));
 
 const customOpen = ref(false);
 
@@ -30,54 +79,6 @@ function saveCustom(hex: string): void {
   customOpen.value = false;
 }
 </script>
-
-<template>
-  <div class="accent-picker">
-    <span class="label text-label-medium">Accent Color</span>
-
-    <div class="swatches" role="radiogroup" aria-label="Accent color">
-      <button
-        v-for="preset in PRESET_ACCENTS"
-        :key="preset.hex"
-        type="button"
-        role="radio"
-        :aria-checked="selected === preset.hex.toLowerCase()"
-        :aria-label="preset.name"
-        class="swatch"
-        :class="{ selected: selected === preset.hex.toLowerCase() }"
-        :style="{ backgroundColor: preset.hex, color: contrastingInk(preset.hex) }"
-        @click="pick(preset.hex)"
-      >
-        <i
-          v-if="selected === preset.hex.toLowerCase()"
-          class="fa-solid fa-check"
-          aria-hidden="true"
-        ></i>
-      </button>
-
-      <button
-        type="button"
-        role="radio"
-        :aria-checked="!isPreset"
-        aria-label="Custom accent color"
-        class="swatch custom"
-        :class="{ selected: !isPreset }"
-        :style="isPreset ? undefined : { backgroundColor: selected, color: contrastingInk(selected) }"
-        @click="customOpen = true"
-      >
-        <i v-if="isPreset" class="fa-solid fa-eye-dropper" aria-hidden="true"></i>
-        <i v-else class="fa-solid fa-check" aria-hidden="true"></i>
-      </button>
-    </div>
-
-    <ColorPickerDialog
-      :open="customOpen"
-      :initial="selected"
-      @save="saveCustom"
-      @dismiss="customOpen = false"
-    />
-  </div>
-</template>
 
 <style scoped>
 .accent-picker {

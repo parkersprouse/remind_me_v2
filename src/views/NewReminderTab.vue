@@ -1,9 +1,17 @@
+<template>
+  <div class='new-reminder'>
+    <ReminderForm ref='formRef' mode='create' @submit='schedule' />
+  </div>
+</template>
+
 <script setup lang="ts">
 import { ref } from 'vue';
+
 import ReminderForm from '../components/ReminderForm.vue';
 import { NotificationManager } from '../lib/notifications';
-import type { RepeatSpec } from '../lib/repeat';
 import { Toaster } from '../lib/toaster';
+
+import type { RepeatSpec } from '../lib/repeat';
 
 /**
  * Mirrors IndexTab: renders the shared reminder form in create mode and
@@ -29,12 +37,6 @@ async function schedule(details: string, dateTime: Date, repeat: RepeatSpec | nu
   });
 }
 </script>
-
-<template>
-  <div class="new-reminder">
-    <ReminderForm ref="formRef" mode="create" @submit="schedule" />
-  </div>
-</template>
 
 <style scoped>
 .new-reminder {

@@ -1,7 +1,54 @@
+<template>
+  <Teleport to='body'>
+    <Transition name='dialog'>
+      <div v-if='option !== null' class='dialog-scrim' @click.self="emit('dismiss')">
+        <div class='edit-card' role='dialog' aria-modal='true'>
+          <div class='title'>
+            <i class='fa-solid fa-pencil title-icon' aria-hidden='true'/>
+            <span class='text-title-large'>Modify Option</span>
+          </div>
+          <div class='divider'/>
+
+          <div class='controls'>
+            <NumberPicker v-model='value' :min='1' :max='maxValue' />
+            <div class='unit-select'>
+              <button
+                type='button'
+                :class="{ selected: unit === 'minutes' }"
+                @click="unit = 'minutes'"
+              >
+                Minutes
+              </button>
+              <button
+                type='button'
+                :class="{ selected: unit === 'hours' }"
+                @click="unit = 'hours'"
+              >
+                Hours
+              </button>
+            </div>
+          </div>
+
+          <div class='actions'>
+            <button type='button' class='btn-text' @click="emit('dismiss')">Close</button>
+            <button type='button' class='btn-filled save' @click="emit('save', value, unit)">
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+</template>
+
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+
+import { parseDurationString } from '../lib/duration';
+
 import NumberPicker from './NumberPicker.vue';
-import { parseDurationString, type DurationOption } from '../lib/duration';
+
+import type { DurationOption } from '../lib/duration';
 
 /**
  * Mirrors the "Modify Option" dialog from the Flutter settings page: a
@@ -38,49 +85,6 @@ watch(unit, () => {
   value.value = Math.min(value.value, maxValue.value);
 });
 </script>
-
-<template>
-  <Teleport to="body">
-    <Transition name="dialog">
-      <div v-if="option !== null" class="dialog-scrim" @click.self="emit('dismiss')">
-        <div class="edit-card" role="dialog" aria-modal="true">
-          <div class="title">
-            <i class="fa-solid fa-pencil title-icon" aria-hidden="true"></i>
-            <span class="text-title-large">Modify Option</span>
-          </div>
-          <div class="divider"></div>
-
-          <div class="controls">
-            <NumberPicker v-model="value" :min="1" :max="maxValue" />
-            <div class="unit-select">
-              <button
-                type="button"
-                :class="{ selected: unit === 'minutes' }"
-                @click="unit = 'minutes'"
-              >
-                Minutes
-              </button>
-              <button
-                type="button"
-                :class="{ selected: unit === 'hours' }"
-                @click="unit = 'hours'"
-              >
-                Hours
-              </button>
-            </div>
-          </div>
-
-          <div class="actions">
-            <button type="button" class="btn-text" @click="emit('dismiss')">Close</button>
-            <button type="button" class="btn-filled save" @click="emit('save', value, unit)">
-              Save
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
-</template>
 
 <style scoped>
 .dialog-scrim {
