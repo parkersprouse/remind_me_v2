@@ -47,11 +47,17 @@ to a password manager / offline backup now.
 
 ## Cut a release
 
-1. **Bump the version** in `src-tauri/tauri.conf.json` (`version`). Tauri
-   propagates it to `versionName`/`versionCode` in
-   `gen/android/app/tauri.properties` on the next build. `versionCode` must
-   strictly increase for every release (Tauri derives it from the semver, e.g.
-   `1.0.0` → `1000000`, `1.0.1` → `1000100`).
+1. **Bump the version.** `pnpm run release` (below) does this automatically
+   before building — a `--minor` bump by default, or pass `--patch` / `--major`
+   to pick the increment (`--skip-semver` to build without bumping). It updates
+   the version in every file that hard-codes it (`package.json`,
+   `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`)
+   via `scripts/bump-version.mjs`; run `pnpm run version:bump [--patch|--minor|--major]`
+   to bump without building. `tauri.conf.json` is the canonical source, so Tauri
+   propagates the new version to `versionName`/`versionCode` in
+   `gen/android/app/tauri.properties` on the next build — no Android file is
+   edited by hand. `versionCode` must strictly increase for every release (Tauri
+   derives it from the semver, e.g. `1.0.0` → `1000000`, `1.0.1` → `1000100`).
 
 2. **Build the signed release APK** (universal, or append `--target aarch64` for
    a single ABI — the output path is the same either way):
@@ -80,7 +86,9 @@ to a password manager / offline backup now.
    Android debug key. (v1 is off by design: it's only needed below API 24, and
    `minSdk` is 24.)
 
-   `pnpm release` runs the build and the verify back-to-back.
+   `pnpm release` bumps the version (step 1), then runs the build and the verify
+   back-to-back — pass the increment flag through to it, e.g. `pnpm release --patch`
+   (default `--minor`, or `--skip-semver` to leave the version untouched).
 
 4. **Distribute** the `.apk`. Users install via
    `adb install app-universal-release.apk`, or by opening the file on-device
