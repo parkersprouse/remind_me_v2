@@ -9,12 +9,12 @@
           </div>
 
           <div class='month-nav'>
-            <span class='month-label text-label-medium'>{{ MONTHS[viewMonth] }} {{ viewYear }}</span>
+            <span class='month-label text-label-medium'>{{ MONTHS[view_month] }} {{ view_year }}</span>
             <span class='nav-buttons'>
-              <button type='button' :disabled='!canGoBack' aria-label='Previous month' @click='changeMonth(-1)'>
+              <button type='button' :disabled='!can_go_back' aria-label='Previous month' @click='changeMonth(-1)'>
                 <i class='fa-solid fa-chevron-left' aria-hidden='true'/>
               </button>
-              <button type='button' :disabled='!canGoForward' aria-label='Next month' @click='changeMonth(1)'>
+              <button type='button' :disabled='!can_go_forward' aria-label='Next month' @click='changeMonth(1)'>
                 <i class='fa-solid fa-chevron-right' aria-hidden='true'/>
               </button>
             </span>
@@ -50,7 +50,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-import { formatDate } from '../lib/format';
+import { formatDate } from '../lib/format.ts';
 
 /**
  * Material-style calendar date picker. Selection is constrained to
@@ -78,24 +78,24 @@ const today = () => {
   return d;
 };
 
-const firstDate = computed(() => today());
-const lastDate = computed(() => {
+const first_date = computed(() => today());
+const last_date = computed(() => {
   const d = today();
   d.setFullYear(d.getFullYear() + 1);
   return d;
 });
 
 const selected = ref(new Date(props.modelValue));
-const viewYear = ref(selected.value.getFullYear());
-const viewMonth = ref(selected.value.getMonth());
+const view_year = ref(selected.value.getFullYear());
+const view_month = ref(selected.value.getMonth());
 
 watch(
   () => props.open,
   (open) => {
     if (!open) return;
     selected.value = new Date(props.modelValue);
-    viewYear.value = selected.value.getFullYear();
-    viewMonth.value = selected.value.getMonth();
+    view_year.value = selected.value.getFullYear();
+    view_month.value = selected.value.getMonth();
   },
 );
 
@@ -108,18 +108,18 @@ interface DayCell {
 }
 
 const grid = computed<(DayCell | null)[]>(() => {
-  const first = new Date(viewYear.value, viewMonth.value, 1);
-  const daysInMonth = new Date(viewYear.value, viewMonth.value + 1, 0).getDate();
+  const first = new Date(view_year.value, view_month.value, 1);
+  const days_in_month = new Date(view_year.value, view_month.value + 1, 0).getDate();
   const cells: (DayCell | null)[] = Array.from({ length: first.getDay() }, () => null);
 
   const sel = selected.value;
   const now = today();
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    const date = new Date(viewYear.value, viewMonth.value, day);
+  for (let day = 1; day <= days_in_month; day += 1) {
+    const date = new Date(view_year.value, view_month.value, day);
     cells.push({
       day,
       date,
-      disabled: date < firstDate.value || date > lastDate.value,
+      disabled: date < first_date.value || date > last_date.value,
       isSelected:
         sel.getFullYear() === date.getFullYear() &&
         sel.getMonth() === date.getMonth() &&
@@ -130,13 +130,17 @@ const grid = computed<(DayCell | null)[]>(() => {
   return cells;
 });
 
-const canGoBack = computed(() => new Date(viewYear.value, viewMonth.value, 1) > new Date(firstDate.value.getFullYear(), firstDate.value.getMonth(), 1));
-const canGoForward = computed(() => new Date(viewYear.value, viewMonth.value, 1) < new Date(lastDate.value.getFullYear(), lastDate.value.getMonth(), 1));
+const can_go_back = computed(() =>
+  new Date(view_year.value, view_month.value, 1) >
+    new Date(first_date.value.getFullYear(), first_date.value.getMonth(), 1));
+const can_go_forward = computed(() =>
+  new Date(view_year.value, view_month.value, 1) <
+    new Date(last_date.value.getFullYear(), last_date.value.getMonth(), 1));
 
 function changeMonth(delta: number): void {
-  const next = new Date(viewYear.value, viewMonth.value + delta, 1);
-  viewYear.value = next.getFullYear();
-  viewMonth.value = next.getMonth();
+  const next = new Date(view_year.value, view_month.value + delta, 1);
+  view_year.value = next.getFullYear();
+  view_month.value = next.getMonth();
 }
 
 function confirm(): void {

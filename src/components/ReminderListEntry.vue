@@ -14,11 +14,11 @@
     </div>
     <div class='meta-line'>
       <i
-        :class="repeatSpec ? 'fa-solid fa-repeat icon' : 'fa-regular fa-clock icon'"
+        :class="repeat_spec ? 'fa-solid fa-repeat icon' : 'fa-regular fa-clock icon'"
         aria-hidden='true'
       />
       <span>{{
-        repeatSpec ? describeRepeat(repeatSpec) : formatEpoch(reminder.scheduledForEpochMillis)
+        repeat_spec ? describeRepeat(repeat_spec) : formatEpoch(reminder.scheduledForEpochMillis)
       }}</span>
     </div>
   </div>
@@ -27,10 +27,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-import { formatEpoch } from '../lib/format';
-import { describeRepeat, parseRepeat } from '../lib/repeat';
+import { formatEpoch } from '../lib/format.ts';
+import { describeRepeat, parseRepeat } from '../lib/repeat.ts';
 
-import type { Reminder } from '../lib/db';
+import type { Reminder } from '../lib/db.ts';
 
 /**
  * List entry: tap shows details, long-press (~500ms hold) opens the entry's
@@ -46,40 +46,40 @@ const emit = defineEmits<{
 
 // Repeating reminders show their rule instead of a timestamp: the OS keeps
 // re-firing them, so a stored one-shot date would immediately go stale.
-const repeatSpec = computed(() => parseRepeat(props.reminder.repeat));
+const repeat_spec = computed(() => parseRepeat(props.reminder.repeat));
 
 const LONG_PRESS_MS = 500;
 const MOVE_CANCEL_PX = 10;
 
-let startX = 0;
-let startY = 0;
-let pressTimer: ReturnType<typeof setTimeout> | null = null;
-let longPressFired = false;
+let start_x = 0;
+let start_y = 0;
+let press_timer: ReturnType<typeof setTimeout> | null = null;
+let long_press_fired = false;
 
 function clearPressTimer(): void {
-  if (pressTimer !== null) {
-    clearTimeout(pressTimer);
-    pressTimer = null;
+  if (press_timer !== null) {
+    clearTimeout(press_timer);
+    press_timer = null;
   }
 }
 
 function onPointerDown(event: PointerEvent): void {
-  startX = event.clientX;
-  startY = event.clientY;
-  longPressFired = false;
+  start_x = event.clientX;
+  start_y = event.clientY;
+  long_press_fired = false;
   clearPressTimer();
-  pressTimer = setTimeout(() => {
-    pressTimer = null;
-    longPressFired = true;
+  press_timer = setTimeout(() => {
+    press_timer = null;
+    long_press_fired = true;
     emit('longPress', props.reminder);
   }, LONG_PRESS_MS);
 }
 
 function onPointerMove(event: PointerEvent): void {
-  if (pressTimer === null) return;
+  if (press_timer === null) return;
   if (
-    Math.abs(event.clientX - startX) > MOVE_CANCEL_PX ||
-    Math.abs(event.clientY - startY) > MOVE_CANCEL_PX
+    Math.abs(event.clientX - start_x) > MOVE_CANCEL_PX ||
+    Math.abs(event.clientY - start_y) > MOVE_CANCEL_PX
   ) {
     clearPressTimer();
   }
@@ -91,7 +91,7 @@ function onPointerEnd(): void {
 
 function onClick(): void {
   // The release after a long-press still produces a click; swallow it.
-  if (longPressFired) return;
+  if (long_press_fired) return;
   emit('showDetails', props.reminder);
 }
 </script>

@@ -13,7 +13,7 @@
               aria-label='Select hour'
               @click="stage = 'hour'"
             >
-              {{ dialHour }}
+              {{ dial_hour }}
             </button>
             <span class='colon'>:</span>
             <button
@@ -23,7 +23,7 @@
               aria-label='Select minute'
               @click="stage = 'minute'"
             >
-              {{ String(dialMinute).padStart(2, '0') }}
+              {{ String(dial_minute).padStart(2, '0') }}
             </button>
             <span class='meridiem'>
               <button
@@ -45,7 +45,7 @@
 
           <div v-else class='fields'>
             <input
-              v-model='hourText'
+              v-model='hour_text'
               class='time-field'
               type='text'
               inputmode='numeric'
@@ -55,7 +55,7 @@
             >
             <span class='colon'>:</span>
             <input
-              v-model='minuteText'
+              v-model='minute_text'
               class='time-field'
               type='text'
               inputmode='numeric'
@@ -88,7 +88,7 @@
 
           <svg
             v-if="mode === 'dial'"
-            ref='dialEl'
+            ref='dial_el'
             class='dial'
             :viewBox='`0 0 ${SIZE} ${SIZE}`'
             xmlns='http://www.w3.org/2000/svg'
@@ -107,13 +107,13 @@
               :y2='knob.y'
             />
             <circle class='dial-hand' :cx='knob.x' :cy='knob.y' :r='KNOB_R' />
-            <circle v-if='knobDot' class='dial-knob-dot' :cx='knob.x' :cy='knob.y' r='2' />
+            <circle v-if='knob_dot' class='dial-knob-dot' :cx='knob.x' :cy='knob.y' r='2' />
             <template v-if="stage === 'hour'">
               <text
-                v-for='cell in hourCells'
+                v-for='cell in hour_cells'
                 :key='cell.value'
                 class='dial-num'
-                :class='{ selected: cell.value === dialHour }'
+                :class='{ selected: cell.value === dial_hour }'
                 :x='cell.x'
                 :y='cell.y'
               >
@@ -122,10 +122,10 @@
             </template>
             <template v-else>
               <text
-                v-for='cell in minuteCells'
+                v-for='cell in minute_cells'
                 :key='cell.value'
                 class='dial-num'
-                :class='{ selected: cell.value === dialMinute }'
+                :class='{ selected: cell.value === dial_minute }'
                 :x='cell.x'
                 :y='cell.y'
               >
@@ -147,7 +147,7 @@
               />
             </button>
             <button type='button' class='btn-text' @click="emit('dismiss')">Cancel</button>
-            <button type='button' class='btn-filled confirm' :disabled='!isValid' @click='confirm'>
+            <button type='button' class='btn-filled confirm' :disabled='!is_valid' @click='confirm'>
               Select
             </button>
           </div>
@@ -178,8 +178,8 @@ const emit = defineEmits<{
   dismiss: [];
 }>();
 
-const hourText = ref('12');
-const minuteText = ref('00');
+const hour_text = ref('12');
+const minute_text = ref('00');
 const meridiem = ref<'AM' | 'PM'>('AM');
 
 const mode = ref<'dial' | 'input'>('dial');
@@ -190,30 +190,30 @@ watch(
   (open) => {
     if (!open) return;
     const h12 = props.hour % 12 === 0 ? 12 : props.hour % 12;
-    hourText.value = String(h12);
-    minuteText.value = String(props.minute).padStart(2, '0');
+    hour_text.value = String(h12);
+    minute_text.value = String(props.minute).padStart(2, '0');
     meridiem.value = props.hour >= 12 ? 'PM' : 'AM';
     mode.value = 'dial';
     stage.value = 'hour';
   },
 );
 
-const parsedHour = computed(() => Number.parseInt(hourText.value, 10));
-const parsedMinute = computed(() => Number.parseInt(minuteText.value, 10));
+const parsed_hour = computed(() => Number.parseInt(hour_text.value, 10));
+const parsed_minute = computed(() => Number.parseInt(minute_text.value, 10));
 
-const isValid = computed(() =>
-  Number.isInteger(parsedHour.value) &&
-  parsedHour.value >= 1 &&
-  parsedHour.value <= 12 &&
-  Number.isInteger(parsedMinute.value) &&
-  parsedMinute.value >= 0 &&
-  parsedMinute.value <= 59);
+const is_valid = computed(() =>
+  Number.isInteger(parsed_hour.value) &&
+  parsed_hour.value >= 1 &&
+  parsed_hour.value <= 12 &&
+  Number.isInteger(parsed_minute.value) &&
+  parsed_minute.value >= 0 &&
+  parsed_minute.value <= 59);
 
 function confirm(): void {
-  if (!isValid.value) return;
-  let hour24 = parsedHour.value % 12;
+  if (!is_valid.value) return;
+  let hour24 = parsed_hour.value % 12;
   if (meridiem.value === 'PM') hour24 += 12;
-  emit('select', hour24, parsedMinute.value);
+  emit('select', hour24, parsed_minute.value);
   emit('dismiss');
 }
 
@@ -235,7 +235,7 @@ function pos(angleDeg: number, radius: number): {
   };
 }
 
-const hourCells = Array.from({ length: 12 }, (_, i) => {
+const hour_cells = Array.from({ length: 12 }, (_, i) => {
   const value = i + 1;
   return {
     value,
@@ -244,7 +244,7 @@ const hourCells = Array.from({ length: 12 }, (_, i) => {
   };
 });
 
-const minuteCells = Array.from({ length: 12 }, (_, i) => {
+const minute_cells = Array.from({ length: 12 }, (_, i) => {
   const value = i * 5;
   return {
     value,
@@ -255,27 +255,27 @@ const minuteCells = Array.from({ length: 12 }, (_, i) => {
 
 // The dial always needs a renderable value, even while the text fields hold
 // garbage in input mode; fall back to 12:00.
-const dialHour = computed(() => {
-  const h = parsedHour.value;
+const dial_hour = computed(() => {
+  const h = parsed_hour.value;
   return Number.isInteger(h) && h >= 1 && h <= 12 ? h : 12;
 });
-const dialMinute = computed(() => {
-  const m = parsedMinute.value;
+const dial_minute = computed(() => {
+  const m = parsed_minute.value;
   return Number.isInteger(m) && m >= 0 && m <= 59 ? m : 0;
 });
 
-const handAngle = computed(() =>
-  stage.value === 'hour' ? (dialHour.value % 12) * 30 : dialMinute.value * 6);
-const knob = computed(() => pos(handAngle.value, NUMBER_R));
+const hand_angle = computed(() =>
+  stage.value === 'hour' ? (dial_hour.value % 12) * 30 : dial_minute.value * 6);
+const knob = computed(() => pos(hand_angle.value, NUMBER_R));
 // A minute off the 5-minute marks gets a small dot inside the knob instead of
 // covering a number (standard Material behavior).
-const knobDot = computed(() => stage.value === 'minute' && dialMinute.value % 5 !== 0);
+const knob_dot = computed(() => stage.value === 'minute' && dial_minute.value % 5 !== 0);
 
-const dialEl = ref<SVGSVGElement | null>(null);
-let dialDragging = false;
+const dial_el = ref<SVGSVGElement | null>(null);
+let dial_dragging = false;
 
 function applyFromEvent(event: PointerEvent): void {
-  const rect = dialEl.value?.getBoundingClientRect();
+  const rect = dial_el.value?.getBoundingClientRect();
   if (!rect) return;
   const dx = event.clientX - (rect.left + rect.width / 2);
   const dy = event.clientY - (rect.top + rect.height / 2);
@@ -283,33 +283,33 @@ function applyFromEvent(event: PointerEvent): void {
 
   if (stage.value === 'hour') {
     const h = Math.round(angle / 30) % 12;
-    hourText.value = String(h === 0 ? 12 : h);
+    hour_text.value = String(h === 0 ? 12 : h);
   } else {
     const m = Math.round(angle / 6) % 60;
-    minuteText.value = String(m).padStart(2, '0');
+    minute_text.value = String(m).padStart(2, '0');
   }
 }
 
 function onDialPointerDown(event: PointerEvent): void {
-  dialDragging = true;
-  dialEl.value?.setPointerCapture(event.pointerId);
+  dial_dragging = true;
+  dial_el.value?.setPointerCapture(event.pointerId);
   applyFromEvent(event);
 }
 
 function onDialPointerMove(event: PointerEvent): void {
-  if (!dialDragging) return;
+  if (!dial_dragging) return;
   applyFromEvent(event);
 }
 
 function onDialPointerUp(): void {
-  if (!dialDragging) return;
-  dialDragging = false;
+  if (!dial_dragging) return;
+  dial_dragging = false;
   // Material dials auto-advance from hour to minute selection
   if (stage.value === 'hour') stage.value = 'minute';
 }
 
 function onDialPointerCancel(): void {
-  dialDragging = false;
+  dial_dragging = false;
 }
 
 function toggleMode(): void {
@@ -319,8 +319,8 @@ function toggleMode(): void {
   }
   // Entering the dial: normalize whatever the text fields hold into values
   // the dial can render.
-  hourText.value = String(dialHour.value);
-  minuteText.value = String(dialMinute.value).padStart(2, '0');
+  hour_text.value = String(dial_hour.value);
+  minute_text.value = String(dial_minute.value).padStart(2, '0');
   mode.value = 'dial';
   stage.value = 'hour';
 }

@@ -10,7 +10,7 @@
     <section v-if='false' class='settings-container'>
       <LabeledSwitch
         :model-value='settings.pageTransitions'
-        @update:model-value='settings.setPageTransitions($event)'
+        @update:modelValue='settings.setPageTransitions($event)'
       >
         <span class='section-title'>
           <i class='fa-solid fa-arrow-right-arrow-left section-icon plain-icon' aria-hidden='true'/>
@@ -22,7 +22,7 @@
     <section class='settings-container'>
       <LabeledSwitch
         :model-value='settings.showQuickSchedule'
-        @update:model-value='settings.setShowQuickSchedule($event)'
+        @update:modelValue='settings.setShowQuickSchedule($event)'
       >
         <span class='section-title'>
           <BadgedIcon icon='fa-solid fa-bell' badge='fa-solid fa-bolt' :size='17' class='section-icon' />
@@ -46,7 +46,7 @@
     <section class='settings-container'>
       <LabeledSwitch
         :model-value='settings.showNotifSnooze'
-        @update:model-value='settings.setShowNotifSnooze($event)'
+        @update:modelValue='settings.setShowNotifSnooze($event)'
       >
         <span class='section-title'>
           <BadgedIcon icon='fa-solid fa-bell' badge='fa-solid fa-circle-pause' :size='17' class='section-icon' />
@@ -57,7 +57,7 @@
       <div class='sub-option'>
         <LabeledSwitch
           :model-value='settings.notifSnoozeCustomButton'
-          @update:model-value='settings.setNotifSnoozeCustomButton($event)'
+          @update:modelValue='settings.setNotifSnoozeCustomButton($event)'
         >
           <span class='sub-title'>
             <i class='fa-regular fa-clock sub-icon' aria-hidden='true'/>
@@ -105,10 +105,10 @@ import BadgedIcon from '../components/BadgedIcon.vue';
 import DurationEditDialog from '../components/DurationEditDialog.vue';
 import LabeledSwitch from '../components/LabeledSwitch.vue';
 import ThemeSelector from '../components/ThemeSelector.vue';
-import { durationFromElements } from '../lib/duration';
-import { useSettingsStore } from '../stores/settings';
+import { durationFromElements } from '../lib/duration.ts';
+import { useSettingsStore } from '../stores/settings.ts';
 
-import type { DurationOption } from '../lib/duration';
+import type { DurationOption } from '../lib/duration.ts';
 
 /**
  * Mirrors SettingsPage: theme selector, Quick-Schedule section, and Reminder

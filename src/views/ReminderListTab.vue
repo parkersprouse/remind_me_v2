@@ -14,24 +14,24 @@
         v-for='reminder in reminders'
         :key='reminder.id'
         :reminder='reminder'
-        @show-details='detailsFor = $event'
-        @long-press='menuFor = $event'
+        @showDetails='details_for = $event'
+        @longPress='menu_for = $event'
       />
     </div>
 
     <!-- Reminder details dialog (tap on an entry) -->
-    <AppDialog :open='detailsFor !== null' @dismiss='detailsFor = null'>
+    <AppDialog :open='details_for !== null' @dismiss='details_for = null'>
       <template #title>
         <i class='fa-regular fa-pen-to-square title-icon' aria-hidden='true'/>
         <span>Reminder Details</span>
       </template>
-      <p class='details-body'>{{ detailsFor?.details }}</p>
+      <p class='details-body'>{{ details_for?.details }}</p>
       <template #actions>
         <button
           type='button'
           class='icon-btn'
           aria-label='Edit Reminder'
-          @click='openEdit(detailsFor!)'
+          @click='openEdit(details_for!)'
         >
           <i class='fa-regular fa-pen-to-square' aria-hidden='true'/>
         </button>
@@ -39,26 +39,26 @@
           type='button'
           class='icon-btn icon-btn-delete'
           aria-label='Delete Reminder'
-          @click='requestDelete(detailsFor!)'
+          @click='requestDelete(details_for!)'
         >
           <i class='fa-regular fa-trash-can' aria-hidden='true'/>
         </button>
         <span class='actions-spacer'/>
-        <button type='button' class='btn-text' @click='detailsFor = null'>Close</button>
+        <button type='button' class='btn-text' @click='details_for = null'>Close</button>
       </template>
     </AppDialog>
 
     <!-- Context menu (long-press on an entry) -->
-    <AppDialog :open='menuFor !== null' @dismiss='menuFor = null'>
+    <AppDialog :open='menu_for !== null' @dismiss='menu_for = null'>
       <template #title>
-        <span class='menu-title'>{{ menuFor?.details }}</span>
+        <span class='menu-title'>{{ menu_for?.details }}</span>
       </template>
       <div class='menu-items'>
-        <button type='button' class='menu-item' @click='openEdit(menuFor!)'>
+        <button type='button' class='menu-item' @click='openEdit(menu_for!)'>
           <i class='fa-regular fa-pen-to-square' aria-hidden='true'/>
           <span>Edit</span>
         </button>
-        <button type='button' class='menu-item menu-item-delete' @click='requestDelete(menuFor!)'>
+        <button type='button' class='menu-item menu-item-delete' @click='requestDelete(menu_for!)'>
           <i class='fa-regular fa-trash-can' aria-hidden='true'/>
           <span>Delete</span>
         </button>
@@ -66,10 +66,10 @@
     </AppDialog>
 
     <!-- Edit reminder dialog -->
-    <EditReminderDialog :reminder='editFor' @dismiss='editFor = null' />
+    <EditReminderDialog :reminder='edit_for' @dismiss='edit_for = null' />
 
     <!-- Confirm deletion dialog -->
-    <AppDialog :open='deleteFor !== null' @dismiss='deleteFor = null'>
+    <AppDialog :open='delete_for !== null' @dismiss='delete_for = null'>
       <template #title>
         <i class='fa-solid fa-circle-exclamation error-icon' aria-hidden='true'/>
         <span>Confirm Deletion</span>
@@ -77,7 +77,7 @@
       <p>Are you sure you want to delete this Reminder?</p>
       <p class='warning'>This cannot be undone!</p>
       <template #actions>
-        <button type='button' class='btn-text' @click='deleteFor = null'>No</button>
+        <button type='button' class='btn-text' @click='delete_for = null'>No</button>
         <button type='button' class='btn-text delete-confirm' @click='confirmDelete'>Yes</button>
       </template>
     </AppDialog>
@@ -90,11 +90,11 @@ import { onMounted, onUnmounted, ref, watch } from 'vue';
 import AppDialog from '../components/AppDialog.vue';
 import EditReminderDialog from '../components/EditReminderDialog.vue';
 import ReminderListEntry from '../components/ReminderListEntry.vue';
-import { DB } from '../lib/db';
-import { NotificationManager, onRemindersChanged } from '../lib/notifications';
-import { useRouterStore } from '../stores/router';
+import { DB } from '../lib/db.ts';
+import { notification_manager, onRemindersChanged } from '../lib/notifications.ts';
+import { useRouterStore } from '../stores/router.ts';
 
-import type { Reminder } from '../lib/db';
+import type { Reminder } from '../lib/db.ts';
 
 /**
  * Mirrors ListTab: reminder list with pull/press-to-refresh, a details dialog
@@ -106,36 +106,36 @@ const router = useRouterStore();
 const reminders = ref<Reminder[]>([]);
 const loading = ref(true);
 
-const detailsFor = ref<Reminder | null>(null);
-const menuFor = ref<Reminder | null>(null);
-const editFor = ref<Reminder | null>(null);
-const deleteFor = ref<Reminder | null>(null);
+const details_for = ref<Reminder | null>(null);
+const menu_for = ref<Reminder | null>(null);
+const edit_for = ref<Reminder | null>(null);
+const delete_for = ref<Reminder | null>(null);
 
 async function getReminders(): Promise<void> {
   loading.value = true;
-  await NotificationManager.cleanExpired();
+  await notification_manager.cleanExpired();
   reminders.value = await DB.getAll();
   loading.value = false;
 }
 
 // The context menu and the details dialog both route here.
 function openEdit(reminder: Reminder): void {
-  menuFor.value = null;
-  detailsFor.value = null;
-  editFor.value = reminder;
+  menu_for.value = null;
+  details_for.value = null;
+  edit_for.value = reminder;
 }
 
 function requestDelete(reminder: Reminder): void {
-  menuFor.value = null;
-  detailsFor.value = null;
-  deleteFor.value = reminder;
+  menu_for.value = null;
+  details_for.value = null;
+  delete_for.value = reminder;
 }
 
 async function confirmDelete(): Promise<void> {
-  const target = deleteFor.value;
-  deleteFor.value = null;
+  const target = delete_for.value;
+  delete_for.value = null;
   if (target === null) return;
-  await NotificationManager.cancel(target.id);
+  await notification_manager.cancel(target.id);
   await getReminders();
 }
 

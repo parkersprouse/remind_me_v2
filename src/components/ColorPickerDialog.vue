@@ -49,7 +49,7 @@
                every channel by v, which is exactly what compositing black at
                1 - v alpha does. -->
           <div class='wheel-veil' :style='{ opacity: 1 - hsv.v }'/>
-          <div class='wheel-thumb' :style='thumbStyle'/>
+          <div class='wheel-thumb' :style='thumb_style'/>
         </div>
 
         <label class='slider-row'>
@@ -60,7 +60,7 @@
             max='1'
             step='0.001'
             :value='hsv.v'
-            :style='{ backgroundImage: valueTrack }'
+            :style='{ backgroundImage: value_track }'
             @input='setValue'
           >
         </label>
@@ -97,8 +97,8 @@
           <input
             type='text'
             class='hex-input'
-            :class='{ invalid: !hexDraftValid }'
-            :value='hexDraft'
+            :class='{ invalid: !hex_draft_valid }'
+            :value='hex_draft'
             maxlength='7'
             spellcheck='false'
             autocapitalize='off'
@@ -131,11 +131,11 @@ import {
   rgbToHsv,
 } from '../lib/color.ts';
 import { contrastingInk } from '../lib/theme.ts';
-import { Toaster } from '../lib/toaster.ts';
+import { toaster } from '../lib/toaster.ts';
 
 import AppDialog from './AppDialog.vue';
 
-import type { Channel, HSV, RGB } from '../lib/color';
+import type { Channel, HSV, RGB } from '../lib/color.ts';
 
 /**
  * In-app accent color picker. Replaces `<input type="color">`, whose platform
@@ -215,21 +215,21 @@ const hsv = reactive<HSV>({
 });
 
 /** Free-text buffer, so a half-typed hex is not rewritten mid-keystroke. */
-const hexDraft = ref('');
+const hex_draft = ref('');
 
 const hex = computed(() => formatHex(rgb));
 const ink = computed(() => contrastingInk(hex.value));
-const hexDraftValid = computed(() => parseHex(hexDraft.value) !== null);
+const hex_draft_valid = computed(() => parseHex(hex_draft.value) !== null);
 
 /** Full-brightness twin of the current color: the top end of the value slider. */
-const valueTrack = computed(() => `linear-gradient(to right, #000000, ${hsvToHex({
+const value_track = computed(() => `linear-gradient(to right, #000000, ${hsvToHex({
   h: hsv.h,
   s: hsv.s,
   v: 1,
 })})`);
 
 /** Where the wheel thumb sits, in percent of the wheel box. */
-const thumbStyle = computed(() => {
+const thumb_style = computed(() => {
   const radians = (hsv.h * Math.PI) / 180;
   return {
     left: `${50 + Math.cos(radians) * hsv.s * 50}%`,
@@ -241,13 +241,13 @@ const thumbStyle = computed(() => {
 function commitRgb(next: RGB): void {
   Object.assign(rgb, next);
   Object.assign(hsv, rgbToHsv(next));
-  hexDraft.value = formatHex(next);
+  hex_draft.value = formatHex(next);
 }
 
 function commitHsv(next: HSV): void {
   Object.assign(hsv, next);
   Object.assign(rgb, hsvToRgb(next));
-  hexDraft.value = formatHex(rgb);
+  hex_draft.value = formatHex(rgb);
 }
 
 // Seed from the accent in use, whichever swatch it came from.
@@ -330,9 +330,9 @@ function channelTrack(key: Channel): string {
  * not expanded to `#aabbcc` under the caret while it is still being typed.
  */
 function setHex(event: Event): void {
-  hexDraft.value = (event.target as HTMLInputElement).value;
+  hex_draft.value = (event.target as HTMLInputElement).value;
 
-  const parsed = parseHex(hexDraft.value);
+  const parsed = parseHex(hex_draft.value);
   if (parsed === null) return;
 
   Object.assign(rgb, parsed);
@@ -340,19 +340,19 @@ function setHex(event: Event): void {
 }
 
 function normalizeHex(): void {
-  hexDraft.value = hex.value;
+  hex_draft.value = hex.value;
 }
 
 async function copyHex(): Promise<void> {
   try {
     await navigator.clipboard.writeText(hex.value);
-    Toaster.show(`Copied ${hex.value}`, {
+    toaster.show(`Copied ${hex.value}`, {
       icon: 'fa-solid fa-circle-check',
       iconColor: '#4caf50',
     });
   } catch (err) {
     console.error('Failed to copy accent color', err);
-    Toaster.show('Failed to Copy Color', {
+    toaster.show('Failed to Copy Color', {
       icon: 'fa-solid fa-circle-exclamation',
       iconColor: '#f44336',
     });

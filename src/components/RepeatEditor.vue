@@ -47,16 +47,16 @@
           <button
             type='button'
             class='chip chip-pill'
-            :class="{ selected: calKind === 'weekly' }"
-            @click="calKind = 'weekly'"
+            :class="{ selected: cal_kind === 'weekly' }"
+            @click="cal_kind = 'weekly'"
           >
             Weekly
           </button>
           <button
             type='button'
             class='chip chip-pill'
-            :class="{ selected: calKind === 'monthly' }"
-            @click="calKind = 'monthly'"
+            :class="{ selected: cal_kind === 'monthly' }"
+            @click="cal_kind = 'monthly'"
           >
             Monthly
           </button>
@@ -75,7 +75,7 @@
           </button>
         </div>
 
-        <div v-if="calKind === 'weekly'" class='row-select weekday-row' role='group' aria-label='Weekday'>
+        <div v-if="cal_kind === 'weekly'" class='row-select weekday-row' role='group' aria-label='Weekday'>
           <button
             v-for='(letter, i) in WEEKDAY_LETTERS'
             :key='i'
@@ -95,7 +95,7 @@
         </div>
 
         <div class='time-row'>
-          <button type='button' class='chip' title='Repeat Time' @click='showTimePicker = true'>
+          <button type='button' class='chip' title='Repeat Time' @click='show_time_picker = true'>
             <i class='fa-regular fa-clock chip-avatar' aria-hidden='true'/>
             {{ formatTimeOfDay(hour, minute) }}
           </button>
@@ -106,11 +106,11 @@
     </div>
 
     <TimePickerDialog
-      :open='showTimePicker'
+      :open='show_time_picker'
       :hour='hour'
       :minute='minute'
       @select='(h, m) => { hour = h; minute = m; }'
-      @dismiss='showTimePicker = false'
+      @dismiss='show_time_picker = false'
     />
   </div>
 </template>
@@ -118,14 +118,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-import { formatTimeOfDay } from '../lib/format';
-import { describeRepeat, ordinal } from '../lib/repeat';
+import { formatTimeOfDay } from '../lib/format.ts';
+import { describeRepeat, ordinal } from '../lib/repeat.ts';
 
 import LabeledSwitch from './LabeledSwitch.vue';
 import NumberPicker from './NumberPicker.vue';
 import TimePickerDialog from './TimePickerDialog.vue';
 
-import type { IntervalUnit, RepeatSpec } from '../lib/repeat';
+import type { IntervalUnit, RepeatSpec } from '../lib/repeat.ts';
 
 /**
  * Repeat rule editor embedded in ReminderForm. Off/on switch; when on, the
@@ -144,14 +144,14 @@ const now = new Date();
 const type = ref<'interval' | 'calendar'>('interval');
 const count = ref(1);
 const unit = ref<IntervalUnit>('days');
-const calKind = ref<'weekly' | 'monthly'>('weekly');
+const cal_kind = ref<'weekly' | 'monthly'>('weekly');
 const every = ref(1);
 const weekday = ref(now.getDay() + 1); // 1=Sunday, matching the spec
 const day = ref(Math.min(now.getDate(), 28));
 const hour = ref(now.getHours());
 const minute = ref(now.getMinutes());
 
-const showTimePicker = ref(false);
+const show_time_picker = ref(false);
 
 // Pre-fill from an existing spec (edit mode mounts this component fresh).
 const initial = model.value;
@@ -162,7 +162,7 @@ if (initial !== null) {
     unit.value = initial.unit;
   } else {
     type.value = 'calendar';
-    calKind.value = initial.kind;
+    cal_kind.value = initial.kind;
     every.value = initial.every;
     hour.value = initial.hour;
     minute.value = initial.minute;
@@ -179,7 +179,7 @@ function buildSpec(): RepeatSpec {
       unit: unit.value,
     };
   }
-  if (calKind.value === 'weekly') {
+  if (cal_kind.value === 'weekly') {
     return {
       kind: 'weekly',
       every: every.value,
@@ -204,7 +204,7 @@ const enabled = computed({
   },
 });
 
-watch([type, count, unit, calKind, every, weekday, day, hour, minute], () => {
+watch([type, count, unit, cal_kind, every, weekday, day, hour, minute], () => {
   if (model.value !== null) model.value = buildSpec();
 });
 

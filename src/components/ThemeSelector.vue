@@ -19,9 +19,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-import { useSettingsStore } from '../stores/settings';
+import { useSettingsStore } from '../stores/settings.ts';
 
-import type { ThemeMode } from '../stores/settings';
+import type { ThemeMode } from '../stores/settings.ts';
 
 /**
  * Mirrors ThemeSelector: a Material segmented button for Light/Dark/System.

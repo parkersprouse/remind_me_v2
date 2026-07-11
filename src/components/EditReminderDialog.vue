@@ -16,15 +16,15 @@
 </template>
 
 <script setup lang="ts">
-import { NotificationManager } from '../lib/notifications';
-import { parseRepeat } from '../lib/repeat';
-import { Toaster } from '../lib/toaster';
+import { notification_manager } from '../lib/notifications.ts';
+import { parseRepeat } from '../lib/repeat.ts';
+import { toaster } from '../lib/toaster.ts';
 
 import AppDialog from './AppDialog.vue';
 import ReminderForm from './ReminderForm.vue';
 
-import type { Reminder } from '../lib/db';
-import type { RepeatSpec } from '../lib/repeat';
+import type { Reminder } from '../lib/db.ts';
+import type { RepeatSpec } from '../lib/repeat.ts';
 
 /**
  * Edit dialog for a not-yet-fired reminder: the shared form pre-filled from
@@ -40,17 +40,17 @@ async function save(details: string, dateTime: Date, repeat: RepeatSpec | null):
   if (target === null) return;
 
   try {
-    await NotificationManager.update(target.id, dateTime, details, target.timezone, repeat);
+    await notification_manager.update(target.id, dateTime, details, target.timezone, repeat);
   } catch (err) {
     console.error('Failed to update reminder', err);
-    Toaster.show('Failed to Update Reminder', {
+    toaster.show('Failed to Update Reminder', {
       icon: 'fa-solid fa-circle-exclamation',
       iconColor: '#f44336',
     });
     return;
   }
 
-  Toaster.show('Reminder Updated', {
+  toaster.show('Reminder Updated', {
     icon: 'fa-solid fa-circle-check',
     iconColor: '#4caf50',
   });

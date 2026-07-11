@@ -1,10 +1,10 @@
 import { LazyStore } from '@tauri-apps/plugin-store';
 import { defineStore } from 'pinia';
 
-import { packageDurations } from '../lib/duration';
-import { DEFAULT_ACCENT } from '../lib/theme';
+import { packageDurations } from '../lib/duration.ts';
+import { DEFAULT_ACCENT } from '../lib/theme.ts';
 
-import type { DurationOption } from '../lib/duration';
+import type { DurationOption } from '../lib/duration.ts';
 
 // Android renders at most three notification action buttons.
 const MAX_NOTIF_ACTIONS = 3;
@@ -17,7 +17,7 @@ export type ThemeMode = 'light' | 'dark' | 'system';
  * equivalent of shared_preferences.
  */
 
-const Defaults = {
+const defaults = {
   theme: 'system' as ThemeMode,
   // Seed color the whole Material 3 palette is generated from.
   accentColor: DEFAULT_ACCENT,
@@ -39,19 +39,19 @@ const Defaults = {
 const persisted = new LazyStore('settings.json');
 
 // Tracks the OS color scheme so `isDarkMode` stays reactive in 'system' mode.
-const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+const system_dark_query = window.matchMedia('(prefers-color-scheme: dark)');
 
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
-    theme: Defaults.theme,
-    accentColor: Defaults.accentColor,
-    showQuickSchedule: Defaults.quickSchedule,
-    quickScheduleOptions: Defaults.quickScheduleOptions,
-    showNotifSnooze: Defaults.notifSnooze,
-    notifSnoozeOptions: Defaults.notifSnoozeOptions,
-    notifSnoozeCustomButton: Defaults.notifSnoozeCustomButton,
-    pageTransitions: Defaults.pageTransitions,
-    systemPrefersDark: systemDarkQuery.matches,
+    theme: defaults.theme,
+    accentColor: defaults.accentColor,
+    showQuickSchedule: defaults.quickSchedule,
+    quickScheduleOptions: defaults.quickScheduleOptions,
+    showNotifSnooze: defaults.notifSnooze,
+    notifSnoozeOptions: defaults.notifSnoozeOptions,
+    notifSnoozeCustomButton: defaults.notifSnoozeCustomButton,
+    pageTransitions: defaults.pageTransitions,
+    systemPrefersDark: system_dark_query.matches,
   }),
 
   getters: {
@@ -81,23 +81,23 @@ export const useSettingsStore = defineStore('settings', {
 
   actions: {
     async load() {
-      this.theme = (await persisted.get<ThemeMode>('theme')) ?? Defaults.theme;
-      this.accentColor = (await persisted.get<string>('accent_color')) ?? Defaults.accentColor;
+      this.theme = (await persisted.get<ThemeMode>('theme')) ?? defaults.theme;
+      this.accentColor = (await persisted.get<string>('accent_color')) ?? defaults.accentColor;
       this.showQuickSchedule =
-        (await persisted.get<boolean>('show_quick_schedule')) ?? Defaults.quickSchedule;
+        (await persisted.get<boolean>('show_quick_schedule')) ?? defaults.quickSchedule;
       this.quickScheduleOptions =
-        (await persisted.get<string[]>('quick_schedule_options')) ?? Defaults.quickScheduleOptions;
+        (await persisted.get<string[]>('quick_schedule_options')) ?? defaults.quickScheduleOptions;
       this.showNotifSnooze =
-        (await persisted.get<boolean>('show_notif_snooze')) ?? Defaults.notifSnooze;
+        (await persisted.get<boolean>('show_notif_snooze')) ?? defaults.notifSnooze;
       this.notifSnoozeOptions =
-        (await persisted.get<string[]>('notif_snooze_options')) ?? Defaults.notifSnoozeOptions;
+        (await persisted.get<string[]>('notif_snooze_options')) ?? defaults.notifSnoozeOptions;
       this.notifSnoozeCustomButton =
         (await persisted.get<boolean>('notif_snooze_custom_button')) ??
-        Defaults.notifSnoozeCustomButton;
+        defaults.notifSnoozeCustomButton;
       this.pageTransitions =
-        (await persisted.get<boolean>('page_transitions')) ?? Defaults.pageTransitions;
+        (await persisted.get<boolean>('page_transitions')) ?? defaults.pageTransitions;
 
-      systemDarkQuery.addEventListener('change', (event) => {
+      system_dark_query.addEventListener('change', (event) => {
         this.systemPrefersDark = event.matches;
       });
     },

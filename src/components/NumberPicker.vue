@@ -1,6 +1,6 @@
 <template>
   <div class='number-picker'>
-    <div ref='listEl' class='wheel' @scroll='onScroll'>
+    <div ref='list_el' class='wheel' @scroll='onScroll'>
       <div class='spacer'/>
       <button
         v-for='value in values()'
@@ -35,32 +35,32 @@ const emit = defineEmits<{ 'update:modelValue': [value: number]; }>();
 
 const ITEM_HEIGHT = 36;
 
-const listEl = ref<HTMLElement | null>(null);
-let scrollDebounce: ReturnType<typeof setTimeout> | undefined;
-let suppressScroll = false;
+const list_el = ref<HTMLElement | null>(null);
+let scroll_debounce: ReturnType<typeof setTimeout> | undefined;
+let suppress_scroll = false;
 
 function values(): number[] {
   return Array.from({ length: props.max - props.min + 1 }, (_, i) => props.min + i);
 }
 
 function scrollToValue(value: number, smooth = false): void {
-  const el = listEl.value;
+  const el = list_el.value;
   if (!el) return;
-  suppressScroll = true;
+  suppress_scroll = true;
   el.scrollTo({
     top: (value - props.min) * ITEM_HEIGHT,
     behavior: smooth ? 'smooth' : 'instant',
   });
   setTimeout(() => {
-    suppressScroll = false;
+    suppress_scroll = false;
   }, smooth ? 300 : 50);
 }
 
 function onScroll(): void {
-  if (suppressScroll) return;
-  if (scrollDebounce !== undefined) clearTimeout(scrollDebounce);
-  scrollDebounce = setTimeout(() => {
-    const el = listEl.value;
+  if (suppress_scroll) return;
+  if (scroll_debounce !== undefined) clearTimeout(scroll_debounce);
+  scroll_debounce = setTimeout(() => {
+    const el = list_el.value;
     if (!el) return;
     const index = Math.round(el.scrollTop / ITEM_HEIGHT);
     const value = Math.min(props.max, Math.max(props.min, props.min + index));
@@ -73,7 +73,9 @@ function select(value: number): void {
   scrollToValue(value, true);
 }
 
-onMounted(() => { scrollToValue(props.modelValue); });
+onMounted(() => {
+  scrollToValue(props.modelValue);
+});
 
 watch(
   () => [props.min, props.max],
@@ -87,7 +89,7 @@ watch(
 watch(
   () => props.modelValue,
   (value) => {
-    const el = listEl.value;
+    const el = list_el.value;
     if (!el) return;
     const current = props.min + Math.round(el.scrollTop / ITEM_HEIGHT);
     if (current !== value) scrollToValue(value, true);

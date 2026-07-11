@@ -10,10 +10,10 @@
       >
         <i class='fa-solid fa-arrow-left' aria-hidden='true'/>
       </button>
-      <span class='title text-title-large'>{{ pageTitle }}</span>
+      <span class='title text-title-large'>{{ page_title }}</span>
       <span class='actions'>
         <button
-          v-if='isDev'
+          v-if='is_dev'
           type='button'
           class='icon-button'
           aria-label='Send test notification'
@@ -36,9 +36,9 @@
     <!-- IndexedStack equivalent: KeepAlive caches every page's state while
          Transition slides the outgoing and incoming pages past each other -->
     <main class='content'>
-      <Transition :name='pageTransitionName'>
+      <Transition :name='page_transition_name'>
         <KeepAlive>
-          <component :is='pageComponents[router.page]' :key='router.page' class='page' />
+          <component :is='page_components[router.page]' :key='router.page' class='page' />
         </KeepAlive>
       </Transition>
     </main>
@@ -66,7 +66,7 @@
       </button>
     </nav>
 
-    <SnoozeDialog :request='customSnoozeRequest' @save='snoozeCustom' @dismiss='dismissSnooze' />
+    <SnoozeDialog :request='custom_snooze_request' @save='snoozeCustom' @dismiss='dismissSnooze' />
 
     <ToasterHost />
   </div>
@@ -78,16 +78,16 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import BadgedIcon from './components/BadgedIcon.vue';
 import SnoozeDialog from './components/SnoozeDialog.vue';
 import ToasterHost from './components/ToasterHost.vue';
-import { customSnoozeRequest, NotificationManager, Permissions } from './lib/notifications';
-import { applyDynamicColor } from './lib/theme';
-import { Toaster } from './lib/toaster';
-import { useRouterStore } from './stores/router';
-import { useSettingsStore } from './stores/settings';
+import { custom_snooze_request, notification_manager, permissions } from './lib/notifications.ts';
+import { applyDynamicColor } from './lib/theme.ts';
+import { toaster } from './lib/toaster.ts';
+import { useRouterStore } from './stores/router.ts';
+import { useSettingsStore } from './stores/settings.ts';
 import HomeView from './views/HomeView.vue';
 import LandingView from './views/LandingView.vue';
 import SettingsView from './views/SettingsView.vue';
 
-import type { Page } from './stores/router';
+import type { Page } from './stores/router.ts';
 import type { Component } from 'vue';
 
 declare global {
@@ -104,38 +104,38 @@ declare global {
 const router = useRouterStore();
 const settings = useSettingsStore();
 
-const isDev = import.meta.env.DEV;
+const is_dev = import.meta.env.DEV;
 
-const pageTitle = computed(() => (router.page === 'settings' ? 'Settings' : 'Remind Me!'));
+const page_title = computed(() => (router.page === 'settings' ? 'Settings' : 'Remind Me!'));
 
-const pageComponents: Record<Page, Component> = {
+const page_components: Record<Page, Component> = {
   landing: LandingView,
   home: HomeView,
   settings: SettingsView,
 };
 
 /** Depth of each page in the navigation flow, used to pick a slide direction. */
-const pageOrder: Record<Page, number> = {
+const page_order: Record<Page, number> = {
   landing: 0,
   home: 1,
   settings: 2,
 };
 
-const slideDirection = ref<'slide-left' | 'slide-right'>('slide-left');
+const slide_direction = ref<'slide-left' | 'slide-right'>('slide-left');
 
 // Runs pre-render, so the transition name is set before the page swap happens:
 // navigating deeper slides the new page in from the right, going back reverses it.
 watch(
   () => router.page,
   (to, from) => {
-    slideDirection.value = pageOrder[to] > pageOrder[from] ? 'slide-left' : 'slide-right';
+    slide_direction.value = page_order[to] > page_order[from] ? 'slide-left' : 'slide-right';
   },
 );
 
 // With page transitions disabled, fall back to a name with no CSS rules:
 // Vue finds no transition styles and swaps the pages instantly.
-const pageTransitionName = computed(() =>
-  settings.pageTransitions ? slideDirection.value : 'page-swap-off');
+const page_transition_name = computed(() =>
+  settings.pageTransitions ? slide_direction.value : 'page-swap-off');
 
 // Theme handling: data-theme drives color-scheme and the static fallback in
 // theme.css, while the accent seed regenerates the Material palette on top of
@@ -156,7 +156,7 @@ watch(
  * once they are.
  */
 async function checkPermission(): Promise<void> {
-  const granted = await Permissions.status();
+  const granted = await permissions.status();
   if (!granted && router.page !== 'landing') {
     router.goTo('landing');
   } else if (granted && router.page === 'landing') {
@@ -186,31 +186,31 @@ onUnmounted(() => {
 });
 
 function debugNotification(): void {
-  void NotificationManager.schedule(new Date(Date.now() + 1000), 'Debug Mode Test');
+  void notification_manager.schedule(new Date(Date.now() + 1000), 'Debug Mode Test');
 }
 
 /** Custom snooze flow: the "Custom…" notification action set this request. */
 function dismissSnooze(): void {
-  customSnoozeRequest.value = null;
+  custom_snooze_request.value = null;
 }
 
 async function snoozeCustom(minutes: number): Promise<void> {
-  const request = customSnoozeRequest.value;
-  customSnoozeRequest.value = null;
+  const request = custom_snooze_request.value;
+  custom_snooze_request.value = null;
   if (request === null) return;
 
   try {
-    await NotificationManager.snooze(request.id, minutes);
+    await notification_manager.snooze(request.id, minutes);
   } catch (err) {
     console.error('Failed to snooze reminder', err);
-    Toaster.show('Failed to Snooze Reminder', {
+    toaster.show('Failed to Snooze Reminder', {
       icon: 'fa-solid fa-circle-exclamation',
       iconColor: '#f44336',
     });
     return;
   }
 
-  Toaster.show('Reminder Snoozed', {
+  toaster.show('Reminder Snoozed', {
     icon: 'fa-solid fa-circle-check',
     iconColor: '#4caf50',
   });

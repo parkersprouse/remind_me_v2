@@ -25,23 +25,23 @@
       <button
         type='button'
         role='radio'
-        :aria-checked='!isPreset'
+        :aria-checked='!is_preset'
         aria-label='Custom accent color'
         class='swatch custom'
-        :class='{ selected: !isPreset }'
-        :style='isPreset ? undefined : { backgroundColor: selected, color: contrastingInk(selected) }'
-        @click='customOpen = true'
+        :class='{ selected: !is_preset }'
+        :style='is_preset ? undefined : { backgroundColor: selected, color: contrastingInk(selected) }'
+        @click='custom_open = true'
       >
-        <i v-if='isPreset' class='fa-solid fa-eye-dropper' aria-hidden='true'/>
+        <i v-if='is_preset' class='fa-solid fa-eye-dropper' aria-hidden='true'/>
         <i v-else class='fa-solid fa-check' aria-hidden='true'/>
       </button>
     </div>
 
     <ColorPickerDialog
-      :open='customOpen'
+      :open='custom_open'
       :initial='selected'
       @save='saveCustom'
-      @dismiss='customOpen = false'
+      @dismiss='custom_open = false'
     />
   </div>
 </template>
@@ -49,8 +49,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import { contrastingInk, PRESET_ACCENTS } from '../lib/theme';
-import { useSettingsStore } from '../stores/settings';
+import { contrastingInk, PRESET_ACCENTS } from '../lib/theme.ts';
+import { useSettingsStore } from '../stores/settings.ts';
 
 import ColorPickerDialog from './ColorPickerDialog.vue';
 
@@ -65,10 +65,10 @@ const settings = useSettingsStore();
 // Hexes are compared lowercased; the picker and the presets agree on that form.
 const selected = computed(() => settings.accentColor.toLowerCase());
 
-const isPreset = computed(() =>
+const is_preset = computed(() =>
   PRESET_ACCENTS.some((preset) => preset.hex.toLowerCase() === selected.value));
 
-const customOpen = ref(false);
+const custom_open = ref(false);
 
 function pick(hex: string): void {
   settings.setAccentColor(hex.toLowerCase());
@@ -76,7 +76,7 @@ function pick(hex: string): void {
 
 function saveCustom(hex: string): void {
   pick(hex);
-  customOpen.value = false;
+  custom_open.value = false;
 }
 </script>
 

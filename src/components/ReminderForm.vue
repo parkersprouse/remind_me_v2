@@ -3,11 +3,11 @@
     <DetailsInput v-model='form.details' />
 
     <div v-if='repeat === null' class='datetime-row'>
-      <button type='button' class='chip' title='Reminder Date' @click='showDatePicker = true'>
+      <button type='button' class='chip' title='Reminder Date' @click='show_date_picker = true'>
         <i class='fa-solid fa-calendar-day chip-avatar' aria-hidden='true'/>
         {{ formatDate(form.date) }}
       </button>
-      <button type='button' class='chip' title='Reminder Time' @click='showTimePicker = true'>
+      <button type='button' class='chip' title='Reminder Time' @click='show_time_picker = true'>
         <i class='fa-regular fa-clock chip-avatar' aria-hidden='true'/>
         {{ formatTimeOfDay(form.hour, form.minute) }}
       </button>
@@ -31,7 +31,7 @@
     </template>
     <div v-else class='quick-row-spacer'/>
 
-    <button type='button' class='btn-filled submit-btn' :disabled='!isReminderValid' @click='submit'>
+    <button type='button' class='btn-filled submit-btn' :disabled='!is_reminder_valid' @click='submit'>
       <i
         :class="mode === 'create' ? 'fa-solid fa-bell' : 'fa-solid fa-floppy-disk'"
         aria-hidden='true'
@@ -39,13 +39,13 @@
       {{ mode === 'create' ? 'Schedule Reminder' : 'Save Reminder' }}
     </button>
 
-    <DatePickerDialog v-model='form.date' :open='showDatePicker' @dismiss='showDatePicker = false' />
+    <DatePickerDialog v-model='form.date' :open='show_date_picker' @dismiss='show_date_picker = false' />
     <TimePickerDialog
-      :open='showTimePicker'
+      :open='show_time_picker'
       :hour='form.hour'
       :minute='form.minute'
       @select='(h, m) => { form.hour = h; form.minute = m; }'
-      @dismiss='showTimePicker = false'
+      @dismiss='show_time_picker = false'
     />
   </div>
 </template>
@@ -53,17 +53,17 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
 
-import { durationToMinutes } from '../lib/duration';
-import { formatDate, formatTimeOfDay } from '../lib/format';
-import { useSettingsStore } from '../stores/settings';
+import { durationToMinutes } from '../lib/duration.ts';
+import { formatDate, formatTimeOfDay } from '../lib/format.ts';
+import { useSettingsStore } from '../stores/settings.ts';
 
 import DatePickerDialog from './DatePickerDialog.vue';
 import DetailsInput from './DetailsInput.vue';
 import RepeatEditor from './RepeatEditor.vue';
 import TimePickerDialog from './TimePickerDialog.vue';
 
-import type { DurationOption } from '../lib/duration';
-import type { RepeatSpec } from '../lib/repeat';
+import type { DurationOption } from '../lib/duration.ts';
+import type { RepeatSpec } from '../lib/repeat.ts';
 
 
 /**
@@ -88,7 +88,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  submit: [details: string, dateTime: Date, repeat: RepeatSpec | null];
+  submit: [details: string, date_time: Date, repeat: RepeatSpec | null];
 }>();
 
 const settings = useSettingsStore();
@@ -103,10 +103,10 @@ const form = reactive({
 
 const repeat = ref<RepeatSpec | null>(props.initialRepeat);
 
-const showDatePicker = ref(false);
-const showTimePicker = ref(false);
+const show_date_picker = ref(false);
+const show_time_picker = ref(false);
 
-const dateTime = computed(() => {
+const date_time = computed(() => {
   const dt = new Date(form.date);
   dt.setHours(form.hour, form.minute, 0, 0);
   return dt;
@@ -114,17 +114,17 @@ const dateTime = computed(() => {
 
 // Validity mirrors ReminderFormModel: details present, date today-or-later,
 // full timestamp strictly in the future.
-const isDateValid = computed(() => {
-  const endOfDay = new Date(form.date);
-  endOfDay.setHours(23, 59, 59, 999);
-  return endOfDay.getTime() >= Date.now();
+const is_date_valid = computed(() => {
+  const end_of_day = new Date(form.date);
+  end_of_day.setHours(23, 59, 59, 999);
+  return end_of_day.getTime() >= Date.now();
 });
-const isTimeValid = computed(() => dateTime.value.getTime() > Date.now());
+const is_time_valid = computed(() => date_time.value.getTime() > Date.now());
 // A repeat rule replaces the one-shot date/time, so only details matter then.
-const isReminderValid = computed(() =>
+const is_reminder_valid = computed(() =>
   repeat.value !== null ?
     form.details.length > 0 :
-    form.details.length > 0 && isDateValid.value && isTimeValid.value);
+    form.details.length > 0 && is_date_valid.value && is_time_valid.value);
 
 function applyQuickOption(option: DurationOption): void {
   const target = new Date(Date.now() + durationToMinutes(option) * 60000);
@@ -143,8 +143,8 @@ function reset(): void {
 }
 
 function submit(): void {
-  if (!isReminderValid.value) return;
-  emit('submit', form.details, dateTime.value, repeat.value);
+  if (!is_reminder_valid.value) return;
+  emit('submit', form.details, date_time.value, repeat.value);
 }
 
 defineExpose({ reset });

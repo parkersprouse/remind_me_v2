@@ -12,7 +12,7 @@
           <p v-if='request.details' class='details'>{{ request.details }}</p>
 
           <div class='controls'>
-            <NumberPicker v-model='value' :min='1' :max='maxValue' />
+            <NumberPicker v-model='value' :min='1' :max='max_value' />
             <div class='unit-select'>
               <button
                 type='button'
@@ -77,10 +77,10 @@ watch(
   },
 );
 
-const maxValue = computed(() => (unit.value === 'minutes' ? 59 : 23));
+const max_value = computed(() => (unit.value === 'minutes' ? 59 : 23));
 
 watch(unit, () => {
-  value.value = Math.min(value.value, maxValue.value);
+  value.value = Math.min(value.value, max_value.value);
 });
 
 function save(): void {
