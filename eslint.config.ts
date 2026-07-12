@@ -299,6 +299,7 @@ export default defineConfigWithVueTs(
    * https://typescript-eslint.io/rules
    */
   {
+    ignores: js_exts.map((ext) => `**/*${ext}`),
     rules: {
       '@typescript-eslint/consistent-type-imports': [
         'error',
