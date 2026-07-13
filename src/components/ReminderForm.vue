@@ -2,34 +2,39 @@
   <div class='reminder-form'>
     <DetailsInput v-model='form.details' />
 
-    <div v-if='repeat === null' class='datetime-row'>
-      <button type='button' class='chip' title='Reminder Date' @click='show_date_picker = true'>
-        <i class='fa-solid fa-calendar-day chip-avatar' aria-hidden='true'/>
-        {{ formatDate(form.date) }}
-      </button>
-      <button type='button' class='chip' title='Reminder Time' @click='show_time_picker = true'>
-        <i class='fa-regular fa-clock chip-avatar' aria-hidden='true'/>
-        {{ formatTimeOfDay(form.hour, form.minute) }}
-      </button>
-    </div>
+    <template v-if='repeat === null'>
+      <div class='datetime-row'>
+        <button type='button' class='chip' title='Reminder Date' @click='show_date_picker = true'>
+          <i class='fa-solid fa-calendar-day chip-avatar' aria-hidden='true'/>
+          {{ formatDate(form.date) }}
+        </button>
+        <button type='button' class='chip' title='Reminder Time' @click='show_time_picker = true'>
+          <i class='fa-regular fa-clock chip-avatar' aria-hidden='true'/>
+          {{ formatTimeOfDay(form.hour, form.minute) }}
+        </button>
+      </div>
+
+      <template v-if="mode === 'create'">
+        <div v-if='settings.showQuickSchedule' class='quick-row'>
+          <button
+            v-for='option in settings.quickOptions'
+            :key='option.raw'
+            type='button'
+            class='chip chip-pill quick-chip'
+            @click='applyQuickOption(option)'
+          >
+            {{ option.label }}
+          </button>
+        </div>
+        <div v-else class='quick-row-spacer'/>
+      </template>
+    </template>
+
+    <div v-else class='quick-row-spacer'/>
 
     <RepeatEditor v-model='repeat' />
 
-    <template v-if="mode === 'create' && repeat === null">
-      <div v-if='settings.showQuickSchedule' class='quick-row'>
-        <button
-          v-for='option in settings.quickOptions'
-          :key='option.raw'
-          type='button'
-          class='chip chip-pill quick-chip'
-          @click='applyQuickOption(option)'
-        >
-          {{ option.label }}
-        </button>
-      </div>
-      <div v-else class='quick-row-spacer'/>
-    </template>
-    <div v-else class='quick-row-spacer'/>
+    <div class='quick-row-spacer'/>
 
     <button type='button' class='btn-filled submit-btn' :disabled='!is_reminder_valid' @click='submit'>
       <i
@@ -173,7 +178,7 @@ defineExpose({ reset });
 }
 
 .quick-row-spacer {
-  height: 24px;
+  height: 16px;
 }
 
 .quick-chip {
