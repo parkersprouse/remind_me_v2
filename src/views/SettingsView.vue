@@ -48,7 +48,7 @@
           @update:modelValue='settings.setNotifSnoozeCustomButton($event)'
         >
           <span class='sub-title'>
-            <i class='fa-regular fa-clock sub-icon' aria-hidden='true'/>
+            <i class='fa-regular fa-clock sub-icon' aria-hidden='true' />
             Custom duration button
           </span>
         </LabeledSwitch>
@@ -64,16 +64,18 @@
           class='chip chip-pill option-chip'
           @click="edit('snooze', index, option)"
         >
-          <i class='fa-solid fa-pencil chip-avatar edit-icon' aria-hidden='true'/>
+          <i class='fa-solid fa-pencil chip-avatar edit-icon' aria-hidden='true' />
           {{ option.label }}
         </button>
-        <span
+        <button
           v-if='settings.notifSnoozeCustomButton'
+          type='button'
           class='chip chip-pill option-chip custom-chip'
+          @click='show_custom_snooze_duration_details = true'
         >
-          <i class='fa-regular fa-clock chip-avatar' aria-hidden='true'/>
+          <i class='fa-regular fa-clock chip-avatar' aria-hidden='true' />
           Custom
-        </span>
+        </button>
       </div>
     </section>
 
@@ -81,6 +83,11 @@
       :option='editing?.option ?? null'
       @save='saveEdit'
       @dismiss='editing = null'
+    />
+
+    <CustomSnoozeDetailsDialog
+      :open='show_custom_snooze_duration_details'
+      @dismiss='show_custom_snooze_duration_details = false'
     />
   </div>
 </template>
@@ -90,6 +97,7 @@ import { ref } from 'vue';
 
 import AccentColorPicker from '~components/AccentColorPicker.vue';
 import BadgedIcon from '~components/BadgedIcon.vue';
+import CustomSnoozeDetailsDialog from '~components/CustomSnoozeDetailsDialog.vue';
 import DurationEditDialog from '~components/DurationEditDialog.vue';
 import LabeledSwitch from '~components/LabeledSwitch.vue';
 import ThemeSelector from '~components/ThemeSelector.vue';
@@ -98,19 +106,21 @@ import { useSettingsStore } from '~stores/settings.ts';
 
 import type { DurationOption } from '~lib/duration.ts';
 
+type OptionGroup = 'quick' | 'snooze';
+
 /**
  * Mirrors SettingsPage: theme selector, Quick-Schedule section, and Reminder
  * Snooze section, each with three editable duration chips.
  */
 const settings = useSettingsStore();
 
-type OptionGroup = 'quick' | 'snooze';
-
 const editing = ref<{
   group: OptionGroup;
   index: number;
   option: DurationOption;
 } | null>(null);
+
+const show_custom_snooze_duration_details = ref<boolean>(false);
 
 function edit(group: OptionGroup, index: number, option: DurationOption): void {
   editing.value = {

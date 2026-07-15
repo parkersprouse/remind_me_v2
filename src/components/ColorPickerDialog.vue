@@ -160,19 +160,19 @@ const MODES: {
   icon: string;
 }[] = [
   {
+    icon: 'fa-solid fa-circle-half-stroke',
     id: 'wheel',
     label: 'Wheel',
-    icon: 'fa-solid fa-circle-half-stroke',
   },
   {
+    icon: 'fa-solid fa-sliders',
     id: 'rgb',
     label: 'RGB',
-    icon: 'fa-solid fa-sliders',
   },
   {
+    icon: 'fa-solid fa-hashtag',
     id: 'hex',
     label: 'Hex',
-    icon: 'fa-solid fa-hashtag',
   },
 ];
 
@@ -203,6 +203,7 @@ const mode = ref<Mode>('wheel');
  * neutral color (chroma 0 has no angle), and re-deriving `rgb` from a rounded
  * `hsv` would drift the value away from the color the dialog opened on.
  */
+/* eslint-disable sort-keys */
 const rgb = reactive<RGB>({
   r: 0,
   g: 0,
@@ -213,6 +214,7 @@ const hsv = reactive<HSV>({
   s: 0,
   v: 0,
 });
+/* eslint-enable sort-keys */
 
 /** Free-text buffer, so a half-typed hex is not rewritten mid-keystroke. */
 const hex_draft = ref('');
@@ -232,9 +234,9 @@ const value_track = computed(() => `linear-gradient(to right, #000000, ${hsvToHe
 const thumb_style = computed(() => {
   const radians = (hsv.h * Math.PI) / 180;
   return {
+    backgroundColor: hex.value,
     left: `${50 + Math.cos(radians) * hsv.s * 50}%`,
     top: `${50 + Math.sin(radians) * hsv.s * 50}%`,
-    backgroundColor: hex.value,
   };
 });
 
@@ -255,11 +257,13 @@ watch(
   () => props.open,
   (open) => {
     if (!open) return;
+    /* eslint-disable sort-keys */
     commitRgb(parseHex(props.initial) ?? {
       r: 0,
       g: 0,
       b: 0,
     });
+    /* eslint-enable sort-keys */
     mode.value = 'wheel';
   },
   { immediate: true },

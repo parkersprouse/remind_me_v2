@@ -92,7 +92,7 @@ import EditReminderDialog from '~components/EditReminderDialog.vue';
 import ReminderListEntry from '~components/ReminderListEntry.vue';
 import { DB } from '~lib/db.ts';
 import { notification_manager, onRemindersChanged } from '~lib/notifications.ts';
-import { useRouterStore } from '~stores/router.ts';
+import { HomeTabs, useRouterStore } from '~stores/router.ts';
 
 import type { Reminder } from '~lib/db.ts';
 
@@ -145,7 +145,7 @@ onMounted(() => {
   void getReminders();
   // Keep the list in sync when reminders fire/snooze/cancel/update elsewhere
   unsubscribe = onRemindersChanged(() => {
-    void (async () => {
+    void (async (): Promise<void> => {
       reminders.value = await DB.getAll();
     })();
   });
@@ -158,7 +158,7 @@ onUnmounted(() => unsubscribe?.());
 watch(
   () => router.homeTab,
   (tab) => {
-    if (tab === 1) void getReminders();
+    if (tab === HomeTabs.ScheduledReminders) void getReminders();
   },
 );
 
@@ -236,10 +236,6 @@ defineExpose({ refresh: getReminders });
 
 .icon-btn-delete {
   color: var(--error);
-}
-
-.actions-spacer {
-  flex: 1;
 }
 
 .menu-title {

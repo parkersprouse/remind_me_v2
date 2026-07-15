@@ -78,6 +78,10 @@ const emit = defineEmits<{ dismiss: []; }>();
   padding: 12px 18px;
 }
 
+.actions-spacer {
+  flex: 1;
+}
+
 .dialog-enter-active,
 .dialog-leave-active {
   transition: opacity 0.15s ease;

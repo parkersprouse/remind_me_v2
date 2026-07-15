@@ -15,5 +15,5 @@ declare global {
 }
 
 export function registerAndroidBackHandler(): void {
-  window.androidBackHandler = () => useRouterStore().back();
+  window.androidBackHandler = (): boolean => useRouterStore().back();
 }

@@ -24,7 +24,7 @@ import { exit } from '@tauri-apps/plugin-process';
 import { ref } from 'vue';
 
 import { permissions } from '~lib/notifications.ts';
-import { useRouterStore } from '~stores/router.ts';
+import { Pages, useRouterStore } from '~stores/router.ts';
 
 /**
  * Mirrors LandingPage: shown until notification permission is granted.
@@ -47,7 +47,7 @@ declare global {
 
 async function requestPermission(): Promise<void> {
   if (await permissions.request()) {
-    router.goTo('home');
+    router.goTo(Pages.Home);
   } else {
     denied.value = true;
   }
