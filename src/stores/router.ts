@@ -5,13 +5,23 @@ import { defineStore } from 'pinia';
  * IndexedStack-style view stack (no URL routing needed).
  */
 
-export type Page = 'landing' | 'home' | 'settings';
+export enum Pages {
+  Landing = 'landing',
+  Home = 'home',
+  Settings = 'settings',
+};
+export type Page = typeof Pages[keyof typeof Pages];
+
+export enum HomeTabs {
+  NewReminder = 0,
+  ScheduledReminders = 1,
+};
+export type HomeTab = typeof HomeTabs[keyof typeof HomeTabs];
 
 export const useRouterStore = defineStore('router', {
   state: () => ({
-    page: 'landing' as Page,
-    /** Active tab on the Home page: 0 = New Reminder, 1 = Scheduled Reminders */
-    homeTab: 0,
+    homeTab: HomeTabs.NewReminder,
+    page: Pages.Landing,
   }),
 
   actions: {
@@ -30,15 +40,43 @@ export const useRouterStore = defineStore('router', {
      * to 'home' lands on whichever tab the user left.
      */
     back(): boolean {
-      if (this.page === 'settings') {
-        this.page = 'home';
+      if (this.page === Pages.Settings) {
+        this.page = Pages.Home;
         return true;
       }
-      if (this.page === 'home' && this.homeTab !== 0) {
-        this.homeTab = 0;
+      if (this.page === Pages.Home && this.homeTab !== HomeTabs.NewReminder) {
+        this.homeTab = HomeTabs.NewReminder;
         return true;
       }
       return false;
+    },
+  },
+
+  getters: {
+    // Current tab getters
+    on_new_reminder_tab(state) {
+      return state.homeTab === HomeTabs.NewReminder;
+    },
+
+    on_scheduled_reminders_tab(state) {
+      return state.homeTab === HomeTabs.ScheduledReminders;
+    },
+
+    // Current page getters
+    on_landing_page(state) {
+      return state.page === Pages.Landing;
+    },
+
+    on_home_page(state) {
+      return state.page === Pages.Home;
+    },
+
+    on_settings_page(state) {
+      return state.page === Pages.Settings;
+    },
+
+    page_title(state) {
+      return state.page === Pages.Settings ? 'Settings' : 'Remind Me!';
     },
   },
 });

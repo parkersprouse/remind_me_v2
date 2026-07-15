@@ -1,16 +1,16 @@
 <template>
-  <div class='app-shell' :class="{ 'no-tab-bar': router.page !== 'home' }">
+  <div class='app-shell' :class="{ 'no-tab-bar': router.page !== Pages.Home }">
     <header class='app-bar'>
       <button
-        v-if="router.page === 'settings'"
+        v-if='router.on_settings_page'
         type='button'
         class='icon-button'
         aria-label='Back'
-        @click="router.goTo('home')"
+        @click='router.goTo(Pages.Home)'
       >
         <i class='fa-solid fa-arrow-left' aria-hidden='true'/>
       </button>
-      <span class='title text-title-large'>{{ page_title }}</span>
+      <span class='title text-title-large'>{{ router.page_title }}</span>
       <span class='actions'>
         <button
           v-if='is_dev'
@@ -22,43 +22,44 @@
           <i class='fa-solid fa-message' aria-hidden='true'/>
         </button>
         <button
-          v-if="router.page === 'home'"
+          v-if='router.on_home_page'
           type='button'
           class='icon-button'
           aria-label='Settings'
-          @click="router.goTo('settings')"
+          @click='router.goTo(Pages.Settings)'
         >
           <i class='fa-solid fa-gear' aria-hidden='true'/>
         </button>
       </span>
     </header>
 
-    <!-- IndexedStack equivalent: KeepAlive caches every page's state while
-         Transition slides the outgoing and incoming pages past each other -->
     <main class='content'>
-      <Transition :name='page_transition_name'>
-        <KeepAlive>
-          <component :is='page_components[router.page]' :key='router.page' class='page' />
-        </KeepAlive>
-      </Transition>
+      <KeepAlive>
+        <component :is='page_components[router.page]' :key='router.page' class='page' />
+      </KeepAlive>
     </main>
 
-    <nav v-if="router.page === 'home'" class='tab-bar'>
+    <nav v-if='router.on_home_page' class='tab-bar'>
       <button
         type='button'
         class='tab'
-        :class='{ active: router.homeTab === 0 }'
-        @click='router.setTab(0)'
+        :class='{ active: router.on_new_reminder_tab }'
+        @click='router.setTab(HomeTabs.NewReminder)'
       >
-        <BadgedIcon icon='fa-solid fa-bell' badge='fa-solid fa-circle-plus' :size='22' />
+        <BadgedIcon
+          icon='fa-solid fa-bell'
+          badge='fa-solid fa-circle-plus'
+          :active='router.on_new_reminder_tab'
+          :size='22'
+        />
         <span>New Reminder</span>
         <span class='indicator' aria-hidden='true'/>
       </button>
       <button
         type='button'
         class='tab'
-        :class='{ active: router.homeTab === 1 }'
-        @click='router.setTab(1)'
+        :class='{ active: router.on_scheduled_reminders_tab }'
+        @click='router.setTab(HomeTabs.ScheduledReminders)'
       >
         <i class='fa-solid fa-list-ul tab-icon' aria-hidden='true'/>
         <span>Scheduled Reminders</span>
@@ -73,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 
 import BadgedIcon from '~components/BadgedIcon.vue';
 import SnoozeDialog from '~components/SnoozeDialog.vue';
@@ -81,7 +82,11 @@ import ToasterHost from '~components/ToasterHost.vue';
 import { custom_snooze_request, notification_manager, permissions } from '~lib/notifications.ts';
 import { applyDynamicColor } from '~lib/theme.ts';
 import { toaster } from '~lib/toaster.ts';
-import { useRouterStore } from '~stores/router.ts';
+import {
+  HomeTabs,
+  Pages,
+  useRouterStore,
+} from '~stores/router.ts';
 import { useSettingsStore } from '~stores/settings.ts';
 import HomeView from '~views/HomeView.vue';
 import LandingView from '~views/LandingView.vue';
@@ -106,8 +111,9 @@ const settings = useSettingsStore();
 
 const is_dev = import.meta.env.DEV;
 
-const page_title = computed(() => (router.page === 'settings' ? 'Settings' : 'Remind Me!'));
+const slide_direction = ref<'slide-left' | 'slide-right'>('slide-left');
 
+/* eslint-disable sort-keys */
 const page_components: Record<Page, Component> = {
   landing: LandingView,
   home: HomeView,
@@ -120,35 +126,7 @@ const page_order: Record<Page, number> = {
   home: 1,
   settings: 2,
 };
-
-const slide_direction = ref<'slide-left' | 'slide-right'>('slide-left');
-
-// Runs pre-render, so the transition name is set before the page swap happens:
-// navigating deeper slides the new page in from the right, going back reverses it.
-watch(
-  () => router.page,
-  (to, from) => {
-    slide_direction.value = page_order[to] > page_order[from] ? 'slide-left' : 'slide-right';
-  },
-);
-
-// With page transitions disabled, fall back to a name with no CSS rules:
-// Vue finds no transition styles and swaps the pages instantly.
-const page_transition_name = computed(() =>
-  settings.pageTransitions ? slide_direction.value : 'page-swap-off');
-
-// Theme handling: data-theme drives color-scheme and the static fallback in
-// theme.css, while the accent seed regenerates the Material palette on top of
-// it. Runs immediately with the defaults, then again once settings.load()
-// hydrates the persisted accent.
-watch(
-  () => [settings.resolvedTheme, settings.accentColor] as const,
-  ([theme, accent]) => {
-    document.documentElement.dataset.theme = theme;
-    applyDynamicColor(accent, theme);
-  },
-  { immediate: true },
-);
+/* eslint-enable sort-keys */
 
 /**
  * Permission gate, mirroring Home._handlePermissionCheck: route to the
@@ -157,10 +135,10 @@ watch(
  */
 async function checkPermission(): Promise<void> {
   const granted = await permissions.status();
-  if (!granted && router.page !== 'landing') {
-    router.goTo('landing');
-  } else if (granted && router.page === 'landing') {
-    router.goTo('home');
+  if (!granted && router.page !== Pages.Landing) {
+    router.goTo(Pages.Landing);
+  } else if (granted && router.on_landing_page) {
+    router.goTo(Pages.Home);
   }
 }
 
@@ -173,17 +151,8 @@ async function checkPermission(): Promise<void> {
  */
 function onResume(): void {
   void checkPermission();
-  if (router.page === 'home') router.setTab(0);
+  if (router.on_home_page) router.setTab(HomeTabs.NewReminder);
 }
-
-onMounted(() => {
-  void checkPermission();
-  window.androidResume = onResume;
-});
-
-onUnmounted(() => {
-  delete window.androidResume;
-});
 
 function debugNotification(): void {
   void notification_manager.schedule(new Date(Date.now() + 1000), 'Debug Mode Test');
@@ -215,6 +184,37 @@ async function snoozeCustom(minutes: number): Promise<void> {
     iconColor: '#4caf50',
   });
 }
+
+// Runs pre-render, so the transition name is set before the page swap happens:
+// navigating deeper slides the new page in from the right, going back reverses it.
+watch(
+  () => router.page,
+  (to, from) => {
+    slide_direction.value = page_order[to] > page_order[from] ? 'slide-left' : 'slide-right';
+  },
+);
+
+// Theme handling: data-theme drives color-scheme and the static fallback in
+// theme.css, while the accent seed regenerates the Material palette on top of
+// it. Runs immediately with the defaults, then again once settings.load()
+// hydrates the persisted accent.
+watch(
+  () => [settings.resolvedTheme, settings.accentColor] as const,
+  ([theme, accent]) => {
+    document.documentElement.dataset.theme = theme;
+    applyDynamicColor(accent, theme);
+  },
+  { immediate: true },
+);
+
+onMounted(() => {
+  void checkPermission();
+  window.androidResume = onResume;
+});
+
+onUnmounted(() => {
+  delete window.androidResume;
+});
 </script>
 
 <style scoped>

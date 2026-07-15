@@ -1,7 +1,7 @@
 <template>
   <span class='badged-icon' :style='{ fontSize: `${size}px` }'>
     <i :class='icon' aria-hidden='true'/>
-    <span v-if='badge' class='badge'>
+    <span v-if='badge' class='badge' :class='{ "badge-active": active }'>
       <i :class='badge' aria-hidden='true'/>
     </span>
   </span>
@@ -15,11 +15,13 @@
  */
 withDefaults(
   defineProps<{
-    icon: string;
+    active?: boolean;
     badge?: string;
+    icon: string;
     size?: number;
   }>(),
   {
+    active: true,
     badge: undefined,
     size: 24,
   },
@@ -42,9 +44,13 @@ withDefaults(
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  filter: saturate(150%) drop-shadow(0 0 1px var(--surface));
   font-size: 0.55em;
-  background-color: var(--surface);
-  border-radius: 50%;
-  padding: 0.08em;
+  border-radius: 100%;
+
+}
+
+.badge.badge-active {
+  color: var(--on-tertiary-container);
 }
 </style>

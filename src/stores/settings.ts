@@ -28,10 +28,6 @@ const defaults = {
   // When true, the last of Android's three notification action slots holds the
   // "Custom…" button (opening the snooze picker) instead of a third preset.
   notifSnoozeCustomButton: true,
-  // Slide animation between top-level pages (landing/home/settings); the
-  // swipeable Home tab pager is unaffected. Off by default — page changes
-  // swap instantly.
-  pageTransitions: false,
 };
 
 // Persistence goes through tauri-plugin-store (settings.json), the moral
@@ -50,7 +46,6 @@ export const useSettingsStore = defineStore('settings', {
     showNotifSnooze: defaults.notifSnooze,
     notifSnoozeOptions: defaults.notifSnoozeOptions,
     notifSnoozeCustomButton: defaults.notifSnoozeCustomButton,
-    pageTransitions: defaults.pageTransitions,
     systemPrefersDark: system_dark_query.matches,
   }),
 
@@ -94,8 +89,6 @@ export const useSettingsStore = defineStore('settings', {
       this.notifSnoozeCustomButton =
         (await persisted.get<boolean>('notif_snooze_custom_button')) ??
         defaults.notifSnoozeCustomButton;
-      this.pageTransitions =
-        (await persisted.get<boolean>('page_transitions')) ?? defaults.pageTransitions;
 
       system_dark_query.addEventListener('change', (event) => {
         this.systemPrefersDark = event.matches;
@@ -135,11 +128,6 @@ export const useSettingsStore = defineStore('settings', {
     setNotifSnoozeCustomButton(enabled: boolean) {
       this.notifSnoozeCustomButton = enabled;
       void persisted.set('notif_snooze_custom_button', enabled);
-    },
-
-    setPageTransitions(enabled: boolean) {
-      this.pageTransitions = enabled;
-      void persisted.set('page_transitions', enabled);
     },
   },
 });

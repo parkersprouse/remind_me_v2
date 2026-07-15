@@ -238,8 +238,8 @@ function pos(angleDeg: number, radius: number): {
 const hour_cells = Array.from({ length: 12 }, (_, i) => {
   const value = i + 1;
   return {
-    value,
     label: String(value),
+    value,
     ...pos(value * 30, NUMBER_R),
   };
 });
@@ -247,8 +247,8 @@ const hour_cells = Array.from({ length: 12 }, (_, i) => {
 const minute_cells = Array.from({ length: 12 }, (_, i) => {
   const value = i * 5;
   return {
-    value,
     label: String(value).padStart(2, '0'),
+    value,
     ...pos(value * 6, NUMBER_R),
   };
 });

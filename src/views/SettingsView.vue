@@ -7,18 +7,6 @@
       </div>
     </section>
 
-    <section v-if='false' class='settings-container'>
-      <LabeledSwitch
-        :model-value='settings.pageTransitions'
-        @update:modelValue='settings.setPageTransitions($event)'
-      >
-        <span class='section-title'>
-          <i class='fa-solid fa-arrow-right-arrow-left section-icon plain-icon' aria-hidden='true'/>
-          Page Transitions
-        </span>
-      </LabeledSwitch>
-    </section>
-
     <section class='settings-container'>
       <LabeledSwitch
         :model-value='settings.showQuickSchedule'
@@ -67,7 +55,7 @@
       </div>
 
       <!-- Live preview of the notification's action buttons: the editable
-           presets that fit, plus the fixed "Custom…" action when enabled. -->
+           presets that fit, plus the fixed "Custom" action when enabled. -->
       <div class='option-chips'>
         <button
           v-for='(option, index) in settings.visibleSnoozeOptions'
@@ -84,7 +72,7 @@
           class='chip chip-pill option-chip custom-chip'
         >
           <i class='fa-regular fa-clock chip-avatar' aria-hidden='true'/>
-          Custom…
+          Custom
         </span>
       </div>
     </section>
@@ -223,19 +211,22 @@ function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
 .option-chip {
   font-size: 15px;
   padding: 8px 12px;
+
+  &:not(.custom-chip) {
+    color: var(--primary);
+    background-color: rgb(from var(--primary) r g b / 0.1);
+  }
 }
 
 /* Fixed preview of the "Custom…" action: styled like a preset chip but
    accent-tinted and non-editable (no pencil, not clickable). */
 .custom-chip,
 .custom-chip:hover {
-  color: var(--primary);
-  background-color: rgb(from var(--primary) r g b / 0.1);
   cursor: default;
 }
 
 .custom-chip .chip-avatar {
-  color: var(--primary);
+  color: currentColor;
 }
 
 .edit-icon {
