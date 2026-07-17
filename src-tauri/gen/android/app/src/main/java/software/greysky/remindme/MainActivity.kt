@@ -79,9 +79,9 @@ class MainActivity : TauriActivity() {
     //  - in-process recreation redelivers the same intent together with the
     //    instance state that recorded it as already handled.
     val fromHistory = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
+    val currentFingerprint = fingerprint(intent)
     val alreadyHandled =
-      fingerprint(intent) != null &&
-        savedInstanceState?.getString(HANDLED_ACTION_KEY) == fingerprint(intent)
+      currentFingerprint != null && savedInstanceState?.getString(HANDLED_ACTION_KEY) == currentFingerprint
     if (!fromHistory && !alreadyHandled) captureNotificationAction(intent)
   }
 
@@ -258,20 +258,22 @@ class MainActivity : TauriActivity() {
     runOnUiThread { webView?.evaluateJavascript(js, null) }
   }
 
-  private fun fingerprint(intent: Intent?): String? {
-    // Extra keys defined by tauri-plugin-notification's TauriNotificationManager.
+  // Extra keys defined by tauri-plugin-notification's TauriNotificationManager.
+  private fun extractAction(intent: Intent?): Pair<Int, String>? {
     val id = intent?.getIntExtra("NotificationId", Int.MIN_VALUE) ?: return null
     if (id == Int.MIN_VALUE) return null
     val actionId = intent.getStringExtra("NotificationUserAction") ?: return null
-    return "$id|$actionId"
+    return Pair(id, actionId)
   }
 
+  private fun fingerprint(intent: Intent?): String? =
+    extractAction(intent)?.let { (id, actionId) -> "$id|$actionId" }
+
   private fun captureNotificationAction(intent: Intent?) {
-    val id = intent?.getIntExtra("NotificationId", Int.MIN_VALUE) ?: return
-    if (id == Int.MIN_VALUE) return
-    val actionId = intent.getStringExtra("NotificationUserAction") ?: return
+    val action = extractAction(intent) ?: return
+    val (id, actionId) = action
     handledActionFingerprint = "$id|$actionId"
-    pendingNotificationAction = Pair(id, actionId)
+    pendingNotificationAction = action
     deliverNotificationAction(0)
   }
 
