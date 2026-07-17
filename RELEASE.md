@@ -84,7 +84,7 @@ to a password manager / offline backup now.
    certs. Expect `Verified using v2 scheme (APK Signature Scheme v2): true` and a
    certificate DN matching the name you entered into `keytool` — **not** the
    Android debug key. (v1 is off by design: it's only needed below API 24, and
-   `minSdk` is 24.)
+   `minSdk` is 26.)
 
    `pnpm release` bumps the version (step 1), then runs the build and the verify
    back-to-back — pass the increment flag through to it, e.g. `pnpm release --patch`
