@@ -17,6 +17,11 @@ import org.json.JSONObject
 
 private const val HANDLED_ACTION_KEY = "handledNotificationAction"
 
+// Arbitrary but distinctive request codes for the backup document pickers;
+// results for codes we don't own fall through to super (Tauri plugins).
+private const val REQUEST_EXPORT_BACKUP = 41001
+private const val REQUEST_IMPORT_BACKUP = 41002
+
 class MainActivity : TauriActivity() {
   private var webView: WebView? = null
 
@@ -36,6 +41,9 @@ class MainActivity : TauriActivity() {
 
   /** Fingerprint ("id|actionId") of the action already delivered by this task. */
   private var handledActionFingerprint: String? = null
+
+  /** Backup JSON waiting for the user to pick a destination in the SAF dialog. */
+  private var pendingExportJson: String? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
     // The app bar is always black, so force light status-bar icons instead of
@@ -116,6 +124,55 @@ class MainActivity : TauriActivity() {
    * denied" path).
    */
   private inner class NativeBridge {
+    /**
+     * Export flow: stash the backup JSON and let the user pick a destination
+     * with the system "create document" dialog (Storage Access Framework, so
+     * no storage permission is needed — the grant covers just the chosen
+     * file). The write happens in onActivityResult; the outcome is reported
+     * to the frontend via window.androidBackupResult (see src/lib/backup.ts).
+     */
+    @JavascriptInterface
+    fun exportBackup(json: String, fileName: String) {
+      // @JavascriptInterface methods run on a WebView background thread.
+      runOnUiThread {
+        pendingExportJson = json
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
+          .addCategory(Intent.CATEGORY_OPENABLE)
+          .setType("application/json")
+          .putExtra(Intent.EXTRA_TITLE, fileName)
+        try {
+          startActivityForResult(intent, REQUEST_EXPORT_BACKUP)
+        } catch (_: Exception) {
+          pendingExportJson = null
+          deliverBackupResult("export-error", "no document picker available")
+        }
+      }
+    }
+
+    /**
+     * Import flow: system "open document" dialog; the file's text is handed
+     * to the frontend in onActivityResult. Providers don't reliably report
+     * .json files as application/json (downloads often come back as
+     * text/plain or octet-stream), hence the wildcard type + mime hint.
+     */
+    @JavascriptInterface
+    fun importBackup() {
+      runOnUiThread {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+          .addCategory(Intent.CATEGORY_OPENABLE)
+          .setType("*/*")
+          .putExtra(
+            Intent.EXTRA_MIME_TYPES,
+            arrayOf("application/json", "text/plain", "application/octet-stream")
+          )
+        try {
+          startActivityForResult(intent, REQUEST_IMPORT_BACKUP)
+        } catch (_: Exception) {
+          deliverBackupResult("import-error", "no document picker available")
+        }
+      }
+    }
+
     @JavascriptInterface
     fun openNotificationSettings() {
       // @JavascriptInterface methods run on a WebView background thread; launch
@@ -139,6 +196,66 @@ class MainActivity : TauriActivity() {
         }
       }
     }
+  }
+
+  @Deprecated("Deprecated in Java")
+  override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+    @Suppress("DEPRECATION")
+    super.onActivityResult(requestCode, resultCode, data)
+    when (requestCode) {
+      REQUEST_EXPORT_BACKUP -> {
+        val json = pendingExportJson
+        pendingExportJson = null
+        val uri = data?.data
+        if (resultCode != RESULT_OK || uri == null || json == null) {
+          deliverBackupResult("export-cancelled", "")
+          return
+        }
+        try {
+          // "wt" truncates when the user overwrites an existing file; some
+          // providers only accept "w", which is equivalent for the fresh
+          // documents CREATE_DOCUMENT normally returns.
+          val stream =
+            try {
+              contentResolver.openOutputStream(uri, "wt")
+            } catch (_: Exception) {
+              contentResolver.openOutputStream(uri)
+            } ?: throw IllegalStateException("provider returned no stream")
+          stream.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+          deliverBackupResult("export-done", "")
+        } catch (e: Exception) {
+          deliverBackupResult("export-error", e.message ?: "write failed")
+        }
+      }
+      REQUEST_IMPORT_BACKUP -> {
+        val uri = data?.data
+        if (resultCode != RESULT_OK || uri == null) {
+          deliverBackupResult("import-cancelled", "")
+          return
+        }
+        try {
+          val text = contentResolver.openInputStream(uri)
+            ?.bufferedReader(Charsets.UTF_8)
+            ?.use { it.readText() }
+            ?: throw IllegalStateException("provider returned no stream")
+          deliverBackupResult("import-data", text)
+        } catch (e: Exception) {
+          deliverBackupResult("import-error", e.message ?: "read failed")
+        }
+      }
+    }
+  }
+
+  /**
+   * Hand a backup picker outcome to the frontend. Unlike the notification
+   * action bridge this needs no retry polling: the picker was launched from
+   * the settings page, so the frontend is booted and its handler registered.
+   */
+  private fun deliverBackupResult(event: String, payload: String) {
+    val js =
+      "window.androidBackupResult && window.androidBackupResult(" +
+        "${JSONObject.quote(event)}, ${JSONObject.quote(payload)})"
+    runOnUiThread { webView?.evaluateJavascript(js, null) }
   }
 
   private fun fingerprint(intent: Intent?): String? {

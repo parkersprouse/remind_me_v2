@@ -12,7 +12,13 @@
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
+    <!-- Auto Backup is deliberately off: a cloud-restored reminders.db would
+         reappear in the list with none of its OS alarms armed (restore never
+         runs the boot receiver). Backups are explicit instead — the user
+         exports/imports a JSON file from Settings -> Backup, and import
+         re-schedules through the app so alarms are genuinely re-armed. -->
     <application
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/Theme.remind_me"

@@ -34,17 +34,6 @@ import { Pages, useRouterStore } from '~stores/router.ts';
 const router = useRouterStore();
 const denied = ref(false);
 
-declare global {
-  interface Window {
-    /**
-     * Native bridge injected by MainActivity.kt (@JavascriptInterface): opens
-     * this app's Android notification settings so the user can re-enable
-     * notifications after denying them.
-     */
-    AndroidNative?: { openNotificationSettings: () => void; };
-  }
-}
-
 async function requestPermission(): Promise<void> {
   if (await permissions.request()) {
     router.goTo(Pages.Home);
