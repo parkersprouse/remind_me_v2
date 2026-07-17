@@ -6,22 +6,13 @@ import { currentTimezone } from '~lib/format.ts';
 export interface Reminder {
   id: number;
   details: string;
-  scheduledForEpochMillis: number;
-  timezone: string;
   /** Serialized RepeatSpec JSON (see repeat.ts); null for one-shot reminders. */
   repeat: string | null;
+  scheduledForEpochMillis: number;
+  timezone: string;
 }
 
-let instance: Database | null = null;
-
-async function db(): Promise<Database> {
-  // The `reminders` table itself is created by the tauri-plugin-sql migration
-  // registered in src-tauri/src/lib.rs.
-  instance ??= await Database.load('sqlite:reminders.db');
-  return instance;
-}
-
-interface ReminderStore {
+export interface ReminderStore {
   insert: (
     id: number,
     details: string,
@@ -33,6 +24,15 @@ interface ReminderStore {
   getById: (id: number) => Promise<Reminder | null>;
   getExpired: (epochMillis: number) => Promise<Reminder[]>;
   remove: (id: number) => Promise<void>;
+}
+
+let instance: Database | null = null;
+
+async function db(): Promise<Database> {
+  // The `reminders` table itself is created by the tauri-plugin-sql migration
+  // registered in src-tauri/src/lib.rs.
+  instance ??= await Database.load('sqlite:reminders.db');
+  return instance;
 }
 
 export const DB: ReminderStore = {

@@ -141,14 +141,14 @@ async function confirmDelete(): Promise<void> {
 
 let unsubscribe: (() => void) | undefined;
 
+async function syncReminders(): Promise<void> {
+  reminders.value = await DB.getAll();
+}
+
 onMounted(() => {
   void getReminders();
   // Keep the list in sync when reminders fire/snooze/cancel/update elsewhere
-  unsubscribe = onRemindersChanged(() => {
-    void (async (): Promise<void> => {
-      reminders.value = await DB.getAll();
-    })();
-  });
+  unsubscribe = onRemindersChanged(() => void syncReminders());
 });
 
 onUnmounted(() => unsubscribe?.());
@@ -169,7 +169,6 @@ defineExpose({ refresh: getReminders });
 .list-tab {
   height: 100%;
   overflow-y: auto;
-  /* border-left: 1px solid var(--outline-variant); */
   /* This element is a scroll container, so HomeView's touch-action doesn't
      reach touches that start inside it: without pan-y here the webview
      claims horizontal drags (pointercancel) and tab swipes never complete. */

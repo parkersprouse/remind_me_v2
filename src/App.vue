@@ -81,7 +81,7 @@ import SnoozeDialog from '~components/SnoozeDialog.vue';
 import ToasterHost from '~components/ToasterHost.vue';
 import { custom_snooze_request, notification_manager, permissions } from '~lib/notifications.ts';
 import { applyDynamicColor } from '~lib/theme.ts';
-import { toaster } from '~lib/toaster.ts';
+import { ERROR_TOAST, SUCCESS_TOAST, toaster } from '~lib/toaster.ts';
 import {
   HomeTabs,
   Pages,
@@ -172,17 +172,11 @@ async function snoozeCustom(minutes: number): Promise<void> {
     await notification_manager.snooze(request.id, minutes);
   } catch (err) {
     console.error('Failed to snooze reminder', err);
-    toaster.show('Failed to Snooze Reminder', {
-      icon: 'fa-solid fa-circle-exclamation',
-      iconColor: '#f44336',
-    });
+    toaster.show('Failed to Snooze Reminder', ERROR_TOAST);
     return;
   }
 
-  toaster.show('Reminder Snoozed', {
-    icon: 'fa-solid fa-circle-check',
-    iconColor: '#4caf50',
-  });
+  toaster.show('Reminder Snoozed', SUCCESS_TOAST);
 }
 
 // Runs pre-render, so the transition name is set before the page swap happens:

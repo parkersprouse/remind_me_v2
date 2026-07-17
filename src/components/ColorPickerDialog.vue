@@ -132,7 +132,7 @@ import {
   rgbToHsv,
 } from '~lib/color.ts';
 import { contrastingInk } from '~lib/theme.ts';
-import { toaster } from '~lib/toaster.ts';
+import { ERROR_TOAST, SUCCESS_TOAST, toaster } from '~lib/toaster.ts';
 
 
 import type { Channel, HSV, RGB } from '~lib/color.ts';
@@ -350,16 +350,10 @@ function normalizeHex(): void {
 async function copyHex(): Promise<void> {
   try {
     await navigator.clipboard.writeText(hex.value);
-    toaster.show(`Copied ${hex.value}`, {
-      icon: 'fa-solid fa-circle-check',
-      iconColor: '#4caf50',
-    });
+    toaster.show(`Copied ${hex.value}`, SUCCESS_TOAST);
   } catch (err) {
     console.error('Failed to copy accent color', err);
-    toaster.show('Failed to Copy Color', {
-      icon: 'fa-solid fa-circle-exclamation',
-      iconColor: '#f44336',
-    });
+    toaster.show('Failed to Copy Color', ERROR_TOAST);
   }
 }
 </script>

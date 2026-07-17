@@ -9,7 +9,7 @@ import { ref } from 'vue';
 
 import ReminderForm from '~components/ReminderForm.vue';
 import { notification_manager } from '~lib/notifications.ts';
-import { toaster } from '~lib/toaster.ts';
+import { ERROR_TOAST, SUCCESS_TOAST, toaster } from '~lib/toaster.ts';
 
 import type { RepeatSpec } from '~lib/repeat.ts';
 
@@ -24,17 +24,11 @@ async function schedule(details: string, dateTime: Date, repeat: RepeatSpec | nu
     await notification_manager.schedule(dateTime, details, undefined, repeat);
   } catch (err) {
     console.error('Failed to schedule reminder', err);
-    toaster.show('Failed to Schedule Reminder', {
-      icon: 'fa-solid fa-circle-exclamation',
-      iconColor: '#f44336',
-    });
+    toaster.show('Failed to Schedule Reminder', ERROR_TOAST);
     return;
   }
   form_ref.value?.reset();
-  toaster.show('Reminder Scheduled', {
-    icon: 'fa-solid fa-circle-check',
-    iconColor: '#4caf50',
-  });
+  toaster.show('Reminder Scheduled', SUCCESS_TOAST);
 }
 </script>
 

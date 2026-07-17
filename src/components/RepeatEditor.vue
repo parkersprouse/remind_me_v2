@@ -213,7 +213,6 @@ const summary = computed(() => (model.value === null ? '' : describeRepeat(model
 
 <style scoped>
 .repeat-editor {
-  /* margin-top: 8px; */
   margin-bottom: 8px;
 }
 

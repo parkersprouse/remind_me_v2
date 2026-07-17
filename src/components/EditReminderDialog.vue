@@ -20,7 +20,7 @@ import AppDialog from '~components/AppDialog.vue';
 import ReminderForm from '~components/ReminderForm.vue';
 import { notification_manager } from '~lib/notifications.ts';
 import { parseRepeat } from '~lib/repeat.ts';
-import { toaster } from '~lib/toaster.ts';
+import { ERROR_TOAST, SUCCESS_TOAST, toaster } from '~lib/toaster.ts';
 
 
 import type { Reminder } from '~lib/db.ts';
@@ -43,17 +43,11 @@ async function save(details: string, dateTime: Date, repeat: RepeatSpec | null):
     await notification_manager.update(target.id, dateTime, details, target.timezone, repeat);
   } catch (err) {
     console.error('Failed to update reminder', err);
-    toaster.show('Failed to Update Reminder', {
-      icon: 'fa-solid fa-circle-exclamation',
-      iconColor: '#f44336',
-    });
+    toaster.show('Failed to Update Reminder', ERROR_TOAST);
     return;
   }
 
-  toaster.show('Reminder Updated', {
-    icon: 'fa-solid fa-circle-check',
-    iconColor: '#4caf50',
-  });
+  toaster.show('Reminder Updated', SUCCESS_TOAST);
   emit('dismiss');
 }
 </script>

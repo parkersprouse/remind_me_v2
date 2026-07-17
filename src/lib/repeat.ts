@@ -1,5 +1,7 @@
 import { Schedule, ScheduleEvery } from '@tauri-apps/plugin-notification';
 
+import { formatTimeOfDay } from '~lib/format.ts';
+
 /**
  * Repeat rules for reminders, serialized as JSON into the `repeat` column.
  *
@@ -105,17 +107,6 @@ export function ordinal(n: number): string {
   return `${n}th`;
 }
 
-const time_formatter = new Intl.DateTimeFormat('en-US', {
-  hour: 'numeric',
-  minute: '2-digit',
-});
-
-function formatRuleTime(hour: number, minute: number): string {
-  const d = new Date();
-  d.setHours(hour, minute, 0, 0);
-  return time_formatter.format(d);
-}
-
 /** "Every 15 minutes", "Every Tuesday at 9:00 AM", "Every 2nd Tuesday at 9:00 AM". */
 export function describeRepeat(spec: RepeatSpec): string {
   switch (spec.kind) {
@@ -126,13 +117,13 @@ export function describeRepeat(spec: RepeatSpec): string {
     case 'weekly': {
       const day = WEEKDAY_NAMES[spec.weekday - 1];
       const prefix = spec.every === 1 ? `Every ${day}` : `Every ${ordinal(spec.every)} ${day}`;
-      return `${prefix} at ${formatRuleTime(spec.hour, spec.minute)}`;
+      return `${prefix} at ${formatTimeOfDay(spec.hour, spec.minute)}`;
     }
     case 'monthly': {
       const day = `the ${ordinal(spec.day)}`;
       const prefix =
         spec.every === 1 ? `Monthly on ${day}` : `Every ${ordinal(spec.every)} month on ${day}`;
-      return `${prefix} at ${formatRuleTime(spec.hour, spec.minute)}`;
+      return `${prefix} at ${formatTimeOfDay(spec.hour, spec.minute)}`;
     }
     // no default
   }

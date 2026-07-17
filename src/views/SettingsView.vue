@@ -135,7 +135,7 @@ import LabeledSwitch from '~components/LabeledSwitch.vue';
 import ThemeSelector from '~components/ThemeSelector.vue';
 import { exportBackup, importBackup } from '~lib/backup.ts';
 import { durationFromElements } from '~lib/duration.ts';
-import { toaster } from '~lib/toaster.ts';
+import { ERROR_TOAST, INFO_TOAST, SUCCESS_TOAST, toaster } from '~lib/toaster.ts';
 import { useSettingsStore } from '~stores/settings.ts';
 
 import type { DurationOption } from '~lib/duration.ts';
@@ -179,27 +179,23 @@ function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
 
 const backup_busy = ref(false);
 
-const SUCCESS_TOAST = {
-  icon: 'fa-solid fa-circle-check',
-  iconColor: '#4caf50',
-};
-const ERROR_TOAST = {
-  icon: 'fa-solid fa-circle-exclamation',
-  iconColor: '#f44336',
-};
-const INFO_TOAST = {
-  icon: 'fa-solid fa-circle-info',
-  iconColor: '#2196f3',
-};
-
 function plural(count: number, noun: string): string {
   return count === 1 ? noun : `${noun}s`;
 }
 
-async function doExport(): Promise<void> {
+/** Runs a backup action under the busy flag; ignores re-entrant clicks. */
+async function runBackupAction(action: () => Promise<void>): Promise<void> {
   if (backup_busy.value) return;
   backup_busy.value = true;
   try {
+    await action();
+  } finally {
+    backup_busy.value = false;
+  }
+}
+
+async function doExport(): Promise<void> {
+  await runBackupAction(async () => {
     const result = await exportBackup();
     switch (result.status) {
       case 'exported':
@@ -215,15 +211,11 @@ async function doExport(): Promise<void> {
         break; // The user backed out of the file picker; nothing to report.
       // no default
     }
-  } finally {
-    backup_busy.value = false;
-  }
+  });
 }
 
 async function doImport(): Promise<void> {
-  if (backup_busy.value) return;
-  backup_busy.value = true;
-  try {
+  await runBackupAction(async () => {
     const result = await importBackup();
     switch (result.status) {
       case 'imported': {
@@ -246,9 +238,7 @@ async function doImport(): Promise<void> {
         break;
       // no default
     }
-  } finally {
-    backup_busy.value = false;
-  }
+  });
 }
 </script>
 

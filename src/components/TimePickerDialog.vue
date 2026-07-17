@@ -5,64 +5,49 @@
         <div class='picker-card' role='dialog' aria-modal='true'>
           <div class='help text-label-medium'>Select time</div>
 
-          <div v-if="mode === 'dial'" class='fields'>
-            <button
-              type='button'
-              class='time-display'
-              :class="{ active: stage === 'hour' }"
-              aria-label='Select hour'
-              @click="stage = 'hour'"
-            >
-              {{ dial_hour }}
-            </button>
-            <span class='colon'>:</span>
-            <button
-              type='button'
-              class='time-display'
-              :class="{ active: stage === 'minute' }"
-              aria-label='Select minute'
-              @click="stage = 'minute'"
-            >
-              {{ String(dial_minute).padStart(2, '0') }}
-            </button>
-            <span class='meridiem'>
+          <div class='fields'>
+            <template v-if="mode === 'dial'">
               <button
                 type='button'
-                :class="{ selected: meridiem === 'AM' }"
-                @click="meridiem = 'AM'"
+                class='time-display'
+                :class="{ active: stage === 'hour' }"
+                aria-label='Select hour'
+                @click="stage = 'hour'"
               >
-                AM
+                {{ dial_hour }}
               </button>
+              <span class='colon'>:</span>
               <button
                 type='button'
-                :class="{ selected: meridiem === 'PM' }"
-                @click="meridiem = 'PM'"
+                class='time-display'
+                :class="{ active: stage === 'minute' }"
+                aria-label='Select minute'
+                @click="stage = 'minute'"
               >
-                PM
+                {{ String(dial_minute).padStart(2, '0') }}
               </button>
-            </span>
-          </div>
-
-          <div v-else class='fields'>
-            <input
-              v-model='hour_text'
-              class='time-field'
-              type='text'
-              inputmode='numeric'
-              maxlength='2'
-              aria-label='Hour'
-              @focus='($event.target as HTMLInputElement).select()'
-            >
-            <span class='colon'>:</span>
-            <input
-              v-model='minute_text'
-              class='time-field'
-              type='text'
-              inputmode='numeric'
-              maxlength='2'
-              aria-label='Minute'
-              @focus='($event.target as HTMLInputElement).select()'
-            >
+            </template>
+            <template v-else>
+              <input
+                v-model='hour_text'
+                class='time-field'
+                type='text'
+                inputmode='numeric'
+                maxlength='2'
+                aria-label='Hour'
+                @focus='($event.target as HTMLInputElement).select()'
+              >
+              <span class='colon'>:</span>
+              <input
+                v-model='minute_text'
+                class='time-field'
+                type='text'
+                inputmode='numeric'
+                maxlength='2'
+                aria-label='Minute'
+                @focus='($event.target as HTMLInputElement).select()'
+              >
+            </template>
             <span class='meridiem'>
               <button
                 type='button'
