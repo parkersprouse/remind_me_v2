@@ -79,6 +79,38 @@
       </div>
     </section>
 
+    <section class='settings-container'>
+      <div class='backup-header'>
+        <span class='section-title'>
+          <BadgedIcon icon='fa-solid fa-bell' badge='fa-solid fa-floppy-disk' :size='17' class='section-icon' />
+          Backup
+        </span>
+      </div>
+      <p class='backup-hint'>
+        Save your scheduled reminders to a file, or restore them from one.
+      </p>
+      <div class='option-chips'>
+        <button
+          type='button'
+          class='chip chip-pill option-chip'
+          :disabled='backup_busy'
+          @click='doExport'
+        >
+          <i class='fa-solid fa-file-export chip-avatar' aria-hidden='true'/>
+          Export
+        </button>
+        <button
+          type='button'
+          class='chip chip-pill option-chip'
+          :disabled='backup_busy'
+          @click='doImport'
+        >
+          <i class='fa-solid fa-file-import chip-avatar' aria-hidden='true'/>
+          Import
+        </button>
+      </div>
+    </section>
+
     <DurationEditDialog
       :option='editing?.option ?? null'
       @save='saveEdit'
@@ -101,7 +133,9 @@ import CustomSnoozeDetailsDialog from '~components/CustomSnoozeDetailsDialog.vue
 import DurationEditDialog from '~components/DurationEditDialog.vue';
 import LabeledSwitch from '~components/LabeledSwitch.vue';
 import ThemeSelector from '~components/ThemeSelector.vue';
+import { exportBackup, importBackup } from '~lib/backup.ts';
 import { durationFromElements } from '~lib/duration.ts';
+import { toaster } from '~lib/toaster.ts';
 import { useSettingsStore } from '~stores/settings.ts';
 
 import type { DurationOption } from '~lib/duration.ts';
@@ -139,6 +173,82 @@ function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
   if (group === 'quick') settings.setQuickScheduleOptions(source);
   else settings.setNotifSnoozeOptions(source);
   editing.value = null;
+}
+
+// --- Backup section ---
+
+const backup_busy = ref(false);
+
+const SUCCESS_TOAST = {
+  icon: 'fa-solid fa-circle-check',
+  iconColor: '#4caf50',
+};
+const ERROR_TOAST = {
+  icon: 'fa-solid fa-circle-exclamation',
+  iconColor: '#f44336',
+};
+const INFO_TOAST = {
+  icon: 'fa-solid fa-circle-info',
+  iconColor: '#2196f3',
+};
+
+function plural(count: number, noun: string): string {
+  return count === 1 ? noun : `${noun}s`;
+}
+
+async function doExport(): Promise<void> {
+  if (backup_busy.value) return;
+  backup_busy.value = true;
+  try {
+    const result = await exportBackup();
+    switch (result.status) {
+      case 'exported':
+        toaster.show(`Exported ${result.count} ${plural(result.count, 'Reminder')}`, SUCCESS_TOAST);
+        break;
+      case 'empty':
+        toaster.show('No Reminders to Export', INFO_TOAST);
+        break;
+      case 'error':
+        toaster.show('Failed to Export Reminders', ERROR_TOAST);
+        break;
+      case 'cancelled':
+        break; // The user backed out of the file picker; nothing to report.
+      // no default
+    }
+  } finally {
+    backup_busy.value = false;
+  }
+}
+
+async function doImport(): Promise<void> {
+  if (backup_busy.value) return;
+  backup_busy.value = true;
+  try {
+    const result = await importBackup();
+    switch (result.status) {
+      case 'imported': {
+        const skipped = result.duplicates + result.expired + result.invalid;
+        if (result.imported === 0) {
+          toaster.show('Nothing New to Import', INFO_TOAST);
+        } else {
+          const base = `Imported ${result.imported} ${plural(result.imported, 'Reminder')}`;
+          toaster.show(skipped > 0 ? `${base} (${skipped} Skipped)` : base, SUCCESS_TOAST);
+        }
+        break;
+      }
+      case 'invalid-file':
+        toaster.show('Not a Remind Me! Backup File', ERROR_TOAST);
+        break;
+      case 'error':
+        toaster.show('Failed to Import Reminders', ERROR_TOAST);
+        break;
+      case 'cancelled':
+        break;
+      // no default
+    }
+  } finally {
+    backup_busy.value = false;
+  }
 }
 </script>
 
@@ -242,4 +352,16 @@ function saveEdit(value: number, unit: 'minutes' | 'hours'): void {
 .edit-icon {
   font-size: 10px;
 }
+
+/* Mirror LabeledSwitch's row padding so the section title lines up. */
+.backup-header {
+  padding: 0 12px;
+}
+
+.backup-hint {
+  margin: 8px 12px 0;
+  font-size: 14px;
+  color: var(--on-surface-variant);
+}
+
 </style>
