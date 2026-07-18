@@ -100,9 +100,15 @@ to a password manager / offline backup now.
   Tauri plugin surface (notifications, the `@JavascriptInterface` bridge in
   `MainActivity.kt`) is kept by the Tauri AAR's consumer ProGuard rules plus
   R8's built-in `@JavascriptInterface` rule — verified by installing the signed
-  release build and exercising the notification flow. If you ever add a new
-  reflectively-invoked native method, confirm it survives R8 the same way (it
-  will be listed in `build/outputs/mapping/universalRelease/seeds.txt`).
+  release build and exercising the notification flow. Those generic rules do
+  *not* cover the notification plugin's plain Jackson model classes: repeat
+  schedules (`Schedule.every` / `Schedule.interval`) failed on release builds
+  only, until the vendored plugin's `android/consumer-rules.pro` added
+  `-keep class app.tauri.notification.** { *; }`. When exercising the
+  notification flow on a release build, test a *repeating* reminder too, not
+  just one-shots. If you ever add a new reflectively-invoked native method,
+  confirm it survives R8 the same way (it will be listed in
+  `build/outputs/mapping/universalRelease/seeds.txt`).
 - The Rust `[profile.release]` in `src-tauri/Cargo.toml` strips symbols and
   optimizes for size; a release APK is ~10 MB vs. the ~30 MB debug APK.
 - To sign an **AAB** instead (e.g. for future Play Store use) drop `--apk`; the
