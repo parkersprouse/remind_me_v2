@@ -47,6 +47,12 @@ class NotificationAction {
   lateinit var id: String
   var title: String? = null
   var input: Boolean? = null
+  // VENDORED FIX: the JS Action interface has always exposed `foreground`, but
+  // Android never parsed it, so every action button was wired to the Activity
+  // and tapping one necessarily launched the app. `false` routes the tap to a
+  // package-local broadcast instead (see BACKGROUND_ACTION_BROADCAST); null /
+  // true keep the original Activity behavior.
+  var foreground: Boolean? = null
 }
 
 @InvokeArg

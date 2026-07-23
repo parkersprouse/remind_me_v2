@@ -73,10 +73,34 @@ declare global {
      * stop retrying.
      */
     androidNotificationAction?: (id: number, actionId: string) => boolean;
+    /**
+     * Bridge target for MainActivity.kt's SNOOZE_JOURNAL_UPDATED receiver:
+     * a background snooze just landed, so pick it up right away instead of
+     * waiting for the next resume.
+     */
+    androidSnoozeJournal?: () => void;
   }
 }
 
-/** Route a notification action tap (from the MainActivity bridge) to snooze. */
+/** One background snooze recorded by SnoozeActionReceiver.kt. */
+interface SnoozeJournalEntry {
+  /** Reminder whose notification carried the tapped button. */
+  sourceId: number;
+  /** Id the receiver armed the snoozed copy under. */
+  newId: number;
+  fireAt: number;
+  details: string;
+}
+
+/**
+ * Route a notification action tap (from the MainActivity bridge) to snooze.
+ *
+ * Only "Custom…" reaches this now — preset buttons are registered with
+ * `foreground: false` and are handled natively without opening the app (see
+ * registerSnoozeActions). The preset branch stays as a fallback for
+ * notifications armed by an older build that are still sitting in the drawer
+ * across an app update, since their PendingIntents still target the Activity.
+ */
 async function handleNotificationAction(id: number, actionId: string): Promise<void> {
   if (!actionId.startsWith(SNOOZE_PREFIX)) return; // plain body taps just open the app
 
@@ -147,6 +171,10 @@ export const notification_manager = {
     window.androidNotificationAction = (id, actionId) => {
       void handleNotificationAction(id, actionId);
       return true;
+    };
+
+    window.androidSnoozeJournal = (): void => {
+      void notification_manager.drainSnoozeJournal();
     };
 
     // Keep repeating reminders rolling: when one is delivered while the app
@@ -235,6 +263,44 @@ export const notification_manager = {
       // Already delivered or unknown — nothing to cancel.
     }
     await DB.remove(id);
+    emitChange();
+  },
+
+  /**
+   * Apply the snoozes SnoozeActionReceiver.kt performed while the frontend was
+   * not running (app closed, or backgrounded with no webview work possible).
+   *
+   * The OS alarm is already armed by the time an entry lands in the journal —
+   * that half has to happen natively, since the reminder must fire even if the
+   * app is never opened again. This is the other half: bringing reminders.db in
+   * line, using exactly the rules snooze() applies in-app, so a background
+   * snooze and an in-app one leave identical state behind.
+   */
+  async drainSnoozeJournal(): Promise<void> {
+    const raw = window.AndroidNative?.takeSnoozeJournal();
+    if (raw === undefined || raw === '') return;
+
+    let entries: SnoozeJournalEntry[];
+    try {
+      entries = JSON.parse(raw) as SnoozeJournalEntry[];
+    } catch {
+      return; // Corrupt journal: the alarms are armed regardless.
+    }
+    if (entries.length === 0) return;
+
+    // Sequential, in write order: snoozing a snoozed reminder makes the next
+    // entry's source the previous entry's copy.
+    for (const entry of entries) {
+      const source = await DB.getById(entry.sourceId);
+      // A one-shot is replaced by its snoozed copy; a repeating reminder keeps
+      // its rule and the copy just joins it (cancelling would kill the
+      // recurrence) — same split as snooze().
+      if (source !== null && source.repeat === null) await DB.remove(entry.sourceId);
+      // Keyed on the id the receiver actually armed, so the row and the alarm
+      // agree and a re-run of a partially applied drain is a no-op.
+      await DB.insert(entry.newId, entry.details, entry.fireAt, source?.timezone);
+    }
+
     emitChange();
   },
 
@@ -344,12 +410,19 @@ async function registerSnoozeActions(): Promise<string | null> {
 
   // The visible presets already account for the custom button claiming a slot;
   // append the custom action only when the setting enables it.
+  //
+  // foreground: false routes a preset tap to SnoozeActionReceiver.kt as a
+  // broadcast, so it re-schedules and clears the notification without ever
+  // launching the app. "Custom…" stays on the foreground/Activity path — it
+  // has nowhere to ask for a duration except the in-app dialog.
   const actions = settings.visibleSnoozeOptions.map((option) => ({
+    foreground: false,
     id: `${SNOOZE_PREFIX}${option.raw}`,
     title: `+ ${option.label}`,
   }));
   if (settings.notifSnoozeCustomButton) {
     actions.push({
+      foreground: true,
       id: CUSTOM_SNOOZE_ACTION_ID,
       title: 'Custom…',
     });

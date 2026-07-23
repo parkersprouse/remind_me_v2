@@ -117,6 +117,9 @@ class NotificationStorage(private val context: Context, private val jsonMapper: 
         editor.putString("id$index", action.id)
         editor.putString("title$index", action.title)
         editor.putBoolean("input$index", action.input ?: false)
+        // Defaults to true so actions that never mention `foreground` keep
+        // launching the Activity, exactly as before.
+        editor.putBoolean("foreground$index", action.foreground ?: true)
       }
       editor.apply()
     }
@@ -130,11 +133,13 @@ class NotificationStorage(private val context: Context, private val jsonMapper: 
       val id = storage.getString("id$i", "")
       val title = storage.getString("title$i", "")
       val input = storage.getBoolean("input$i", false)
+      val foreground = storage.getBoolean("foreground$i", true)
 
       val action = NotificationAction()
       action.id = id ?: ""
       action.title = title
       action.input = input
+      action.foreground = foreground
       actions[i] = action
     }
     return actions

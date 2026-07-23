@@ -81,6 +81,19 @@ class Notification {
   }
 
   companion object {
+    /**
+     * VENDORED FIX: Jackson is an `implementation` dependency of this module,
+     * so its types cannot appear in signatures the consuming app calls — an
+     * app-side receiver handling a background action (see
+     * BACKGROUND_ACTION_BROADCAST) could not otherwise decode the serialized
+     * notification the intent carries. Returns null on anything unparseable.
+     */
+    fun fromJson(json: String): Notification? = try {
+      storageJsonMapper().readValue(json, Notification::class.java)
+    } catch (_: Exception) {
+      null
+    }
+
     fun buildNotificationPendingList(notifications: List<Notification>): List<PendingNotification> {
       val pendingNotifications = mutableListOf<PendingNotification>()
       for (notification in notifications) {

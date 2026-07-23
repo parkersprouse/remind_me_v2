@@ -24,5 +24,8 @@ registerAndroidBackHandler();
 void (async () => {
   await useSettingsStore().load();
   await notification_manager.init();
+  // Before cleanExpired: a background snooze that already fired while the app
+  // was closed needs its row present for the sweep to reason about it.
+  await notification_manager.drainSnoozeJournal();
   await notification_manager.cleanExpired();
 })();

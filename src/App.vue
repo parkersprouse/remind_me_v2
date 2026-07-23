@@ -151,6 +151,9 @@ async function checkPermission(): Promise<void> {
  */
 function onResume(): void {
   void checkPermission();
+  // Picks up snoozes taken from the drawer while the app sat in the background
+  // (they never reached the webview — see drainSnoozeJournal).
+  void notification_manager.drainSnoozeJournal();
   if (router.on_home_page) router.setTab(HomeTabs.NewReminder);
 }
 

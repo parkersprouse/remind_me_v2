@@ -1,6 +1,9 @@
 package software.greysky.remindme
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -13,6 +16,7 @@ import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.ContextCompat
 import org.json.JSONObject
 
 private const val HANDLED_ACTION_KEY = "handledNotificationAction"
@@ -44,6 +48,23 @@ class MainActivity : TauriActivity() {
 
   /** Backup JSON waiting for the user to pick a destination in the SAF dialog. */
   private var pendingExportJson: String? = null
+
+  /**
+   * Nudges the frontend to drain the snooze journal the moment a background
+   * snooze lands (SnoozeActionReceiver).
+   *
+   * The frontend also drains at startup and from androidResume, which covers a
+   * snooze taken while the app was dead or backgrounded. Neither covers the
+   * remaining case: the app is in the foreground and the user snoozes a
+   * heads-up notification. The notification shade is an overlay, so the
+   * Activity never pauses and no resume ever arrives — without this the
+   * reminder list would sit stale until the user navigated away and back.
+   */
+  private val snoozeJournalReceiver = object : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+      webView?.evaluateJavascript("window.androidSnoozeJournal && window.androidSnoozeJournal()", null)
+    }
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     // The app bar is always black, so force light status-bar icons instead of
@@ -78,6 +99,13 @@ class MainActivity : TauriActivity() {
     //    LAUNCHED_FROM_HISTORY;
     //  - in-process recreation redelivers the same intent together with the
     //    instance state that recorded it as already handled.
+    ContextCompat.registerReceiver(
+      this,
+      snoozeJournalReceiver,
+      IntentFilter(SNOOZE_JOURNAL_UPDATED),
+      ContextCompat.RECEIVER_NOT_EXPORTED,
+    )
+
     val fromHistory = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
     val currentFingerprint = fingerprint(intent)
     val alreadyHandled =
@@ -103,6 +131,11 @@ class MainActivity : TauriActivity() {
   override fun onResume() {
     super.onResume()
     webView?.evaluateJavascript("window.androidResume && window.androidResume()", null)
+  }
+
+  override fun onDestroy() {
+    unregisterReceiver(snoozeJournalReceiver)
+    super.onDestroy()
   }
 
   override fun onSaveInstanceState(outState: Bundle) {
@@ -172,6 +205,15 @@ class MainActivity : TauriActivity() {
         }
       }
     }
+
+    /**
+     * Hands over (and clears) the snoozes performed by SnoozeActionReceiver
+     * while no webview was around to update reminders.db. Returns a JSON array
+     * string; unlike the backup methods this is synchronous, since
+     * @JavascriptInterface return values cross straight back into JS.
+     */
+    @JavascriptInterface
+    fun takeSnoozeJournal(): String = SnoozeJournal.takeAll(this@MainActivity)
 
     @JavascriptInterface
     fun openNotificationSettings() {

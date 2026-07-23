@@ -37,6 +37,19 @@
             </intent-filter>
         </activity>
 
+        <!-- Preset snooze buttons are registered with `foreground: false`, so
+             the notification plugin sends their taps here as a package-scoped
+             broadcast instead of launching MainActivity. Without this
+             registration the PendingIntent resolves to nothing and tapping a
+             snooze button would silently do nothing at all. -->
+        <receiver
+            android:name=".SnoozeActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="app.tauri.notification.BACKGROUND_ACTION" />
+            </intent-filter>
+        </receiver>
+
         <provider
           android:name="androidx.core.content.FileProvider"
           android:authorities="${applicationId}.fileprovider"

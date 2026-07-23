@@ -41,6 +41,38 @@ const val REMOTE_INPUT_KEY = "NotificationRemoteInput"
 const val DEFAULT_NOTIFICATION_CHANNEL_ID = "default"
 const val DEFAULT_PRESS_ACTION = "tap"
 
+// VENDORED FIX: broadcast delivered (package-scoped, so it stays internal to
+// the host app) when an action declared `foreground = false` is tapped. The
+// plugin cannot know what such an action *means*, so it only routes: the app
+// registers a receiver for this in its own manifest and handles the tap
+// without the Activity — and therefore without launching the app. Extras are
+// the same three the Activity path carries: NotificationId,
+// NotificationUserAction and the serialized notification.
+const val BACKGROUND_ACTION_BROADCAST = "app.tauri.notification.BACKGROUND_ACTION"
+
+/**
+ * VENDORED FIX: arms a notification from outside the plugin — a receiver
+ * handling a BACKGROUND_ACTION_BROADCAST tap, where there is no plugin
+ * instance and no Activity.
+ *
+ * Exists as a plugin-level function for two reasons: the app cannot construct
+ * a NotificationStorage itself (that needs an ObjectMapper, and Jackson is an
+ * `implementation` dependency of this module, invisible to consumers), and
+ * scheduling has an invariant worth keeping in one place — the manager only
+ * arms the alarm, so the caller must also persist the request or it will not
+ * survive a reboot (NotificationPlugin.show pairs the two the same way).
+ */
+fun scheduleNotificationInBackground(context: Context, notification: Notification) {
+  val storage = NotificationStorage(context, storageJsonMapper())
+  val config = try {
+    PluginManager.loadConfig(context, "notification", PluginConfig::class.java)
+  } catch (_: Exception) {
+    null
+  }
+  TauriNotificationManager(storage, null, context, config).schedule(notification)
+  storage.appendNotifications(listOf(notification))
+}
+
 class TauriNotificationManager(
   private val storage: NotificationStorage,
   private val activity: Activity?,
@@ -242,14 +274,28 @@ class TauriNotificationManager(
     if (actionTypeId != null) {
       val actionGroup = storage.getActionGroup(actionTypeId)
       for (notificationAction in actionGroup) {
+        if (notificationAction == null) continue
         // TODO Add custom icons to actions
-        val actionIntent = buildIntent(notification, notificationAction!!.id)
-        val actionPendingIntent = PendingIntent.getActivity(
-          context,
-          (notification.id) + notificationAction.id.hashCode(),
-          actionIntent,
-          flags
-        )
+        val requestCode = (notification.id) + notificationAction.id.hashCode()
+        val actionPendingIntent = if (notificationAction.foreground == false) {
+          PendingIntent.getBroadcast(
+            context,
+            requestCode,
+            buildBackgroundActionIntent(notification, notificationAction.id),
+            // Deliberately IMMUTABLE rather than the `flags` above: Android 14+
+            // rejects a mutable PendingIntent wrapping an implicit intent, and
+            // mutability is only needed for RemoteInput, which a background
+            // action cannot use (there is no UI to collect input into).
+            PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE
+          )
+        } else {
+          PendingIntent.getActivity(
+            context,
+            requestCode,
+            buildIntent(notification, notificationAction.id),
+            flags
+          )
+        }
         val actionBuilder: NotificationCompat.Action.Builder = NotificationCompat.Action.Builder(
           R.drawable.ic_transparent,
           notificationAction.title,
@@ -299,11 +345,40 @@ class TauriNotificationManager(
     intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
     intent.putExtra(NOTIFICATION_INTENT_KEY, notification.id)
     intent.putExtra(ACTION_INTENT_KEY, action)
-    intent.putExtra(NOTIFICATION_OBJ_INTENT_KEY, notification.sourceJson)
+    intent.putExtra(NOTIFICATION_OBJ_INTENT_KEY, serializeNotification(notification))
     val schedule = notification.schedule
     intent.putExtra(NOTIFICATION_IS_REMOVABLE_KEY, schedule == null || schedule.isRemovable())
     return intent
   }
+
+  /**
+   * Intent for an action declared `foreground = false`, aimed at whatever
+   * receiver the host app registered for BACKGROUND_ACTION_BROADCAST. Scoped
+   * to this package so the broadcast never leaves the app; deliberately *not*
+   * built on top of buildIntent(), whose ACTION_MAIN / CATEGORY_LAUNCHER shape
+   * is what makes the Activity path launch the app in the first place.
+   */
+  private fun buildBackgroundActionIntent(notification: Notification, action: String): Intent =
+    Intent(BACKGROUND_ACTION_BROADCAST)
+      .setPackage(context.packageName)
+      .putExtra(NOTIFICATION_INTENT_KEY, notification.id)
+      .putExtra(ACTION_INTENT_KEY, action)
+      .putExtra(NOTIFICATION_OBJ_INTENT_KEY, serializeNotification(notification))
+
+  /**
+   * VENDORED FIX: upstream put `notification.sourceJson` in the action intents,
+   * but nothing in the plugin ever assigns sourceJson (see NotificationStorage),
+   * so the extra was always null and `actionPerformed` reported a null
+   * notification. Serialize the object itself, matching what the storage does —
+   * which is also what lets a background action re-create the notification with
+   * no knowledge of how it was originally built.
+   */
+  private fun serializeNotification(notification: Notification): String? =
+    notification.sourceJson ?: try {
+      storageJsonMapper().writeValueAsString(notification)
+    } catch (_: Exception) {
+      null
+    }
 
   /**
    * Build a notification trigger, such as triggering each N seconds, or

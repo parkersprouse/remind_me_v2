@@ -17,6 +17,12 @@ export interface AndroidNativeBridge {
   exportBackup: (json: string, fileName: string) => void;
   /** Launches the system "open document" picker and reads the chosen file. */
   importBackup: () => void;
+  /**
+   * Returns (and clears) the snoozes SnoozeActionReceiver.kt performed while
+   * the frontend was not running, as a JSON array string. Synchronous, unlike
+   * the backup pickers — see drainSnoozeJournal in notifications.ts.
+   */
+  takeSnoozeJournal: () => string;
 }
 
 declare global {
