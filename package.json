@@ -3,14 +3,21 @@
   "private": true,
   "version": "1.5.0",
   "type": "module",
+  "engines": {
+    "node": "^24",
+    "pnpm": "^11"
+  },
   "scripts": {
     "start": "pnpm run dev",
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
+    "dev:android": "tauri android dev",
+    "build:android": "tauri android build --apk --target aarch64",
+    "preview:android": "tauri android run --target aarch64",
     "tauri": "tauri",
     "version:bump": "node scripts/bump-version.mjs",
-    "release:build": "tauri android build --apk",
+    "release:build": "tauri android build --apk --target aarch64",
     "release:verify": "APK=src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk; SDK=\"${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}\"; APKSIGNER=$(ls \"$SDK\"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1); \"$APKSIGNER\" verify --print-certs \"$APK\"",
     "release": "node scripts/release.mjs",
     "publish": "node scripts/publish-release.mjs",

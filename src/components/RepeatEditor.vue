@@ -29,7 +29,6 @@
 
       <div v-if="type === 'interval'" class='interval-controls'>
         <div class='interval-row'>
-          <NumberPicker v-model='count' :min='1' :max='99' />
           <div class='unit-select'>
             <button
               v-for='u in UNITS'
@@ -38,14 +37,17 @@
               :class='{ selected: unit === u }'
               @click='unit = u'
             >
-              {{ u.charAt(0).toUpperCase() + u.slice(1) }}
+              {{ toCapitalCase(u) }}
             </button>
           </div>
-        </div>
-
-        <div v-if="unit === 'hours'" class='day-row'>
-          <span class='day-label'>At minute</span>
-          <NumberPicker v-model='minute' :min='0' :max='59' />
+          <div class='unit-column'>
+            <span class='unit-label'>{{ toCapitalCase(unit) }}</span>
+            <NumberPicker v-model='count' :min='1' :max='99' />
+          </div>
+          <div v-if="unit === 'hours'" class='unit-column'>
+            <span class='unit-label'>At minute</span>
+            <NumberPicker v-model='minute' :min='0' :max='59' />
+          </div>
         </div>
       </div>
 
@@ -104,12 +106,11 @@
           </button>
         </div>
 
-        <div v-else-if="cal_kind === 'monthly'" class='day-row'>
-          <span class='day-label'>Day of month</span>
-          <NumberPicker v-model='day' :min='1' :max='28' />
-        </div>
-
         <div class='time-row'>
+          <div v-if="cal_kind === 'monthly'" class='day-row'>
+            <span class='day-label'>Day of month</span>
+            <NumberPicker v-model='day' :min='1' :max='28' />
+          </div>
           <button type='button' class='chip' title='Repeat Time' @click='show_time_picker = true'>
             <i class='fa-regular fa-clock chip-avatar' aria-hidden='true'/>
             {{ formatTimeOfDay(hour, minute) }}
@@ -133,12 +134,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-
 import LabeledSwitch from '~components/LabeledSwitch.vue';
 import NumberPicker from '~components/NumberPicker.vue';
 import TimePickerDialog from '~components/TimePickerDialog.vue';
 import { formatTimeOfDay } from '~lib/format.ts';
 import { describeRepeat, ordinal } from '~lib/repeat.ts';
+import { toCapitalCase } from '~lib/util.ts';
 
 import type { IntervalUnit, RepeatSpec } from '~lib/repeat.ts';
 
@@ -287,7 +288,7 @@ const summary = computed(() => (model.value === null ? '' : describeRepeat(model
 .interval-row {
   display: flex;
   align-items: center;
-  justify-content: space-evenly;
+  justify-content: center;
   gap: 16px;
   margin-bottom: 12px;
 }
@@ -304,7 +305,7 @@ const summary = computed(() => (model.value === null ? '' : describeRepeat(model
   font-size: 15px;
   font-weight: 500;
   color: var(--on-surface);
-  text-align: left;
+  text-align: center;
 }
 
 .unit-select button.selected {
@@ -346,10 +347,23 @@ const summary = computed(() => (model.value === null ? '' : describeRepeat(model
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 8px;
   margin-bottom: 12px;
 }
 
+.unit-column {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.unit-label,
 .day-label {
   color: var(--on-surface-variant);
   font-size: 14px;
@@ -358,6 +372,8 @@ const summary = computed(() => (model.value === null ? '' : describeRepeat(model
 .time-row {
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 16px;
 }
 
 .summary {

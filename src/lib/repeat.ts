@@ -147,7 +147,7 @@ export function describeRepeat(spec: RepeatSpec): string {
     case 'interval': {
       const unit = spec.count === 1 ? spec.unit.slice(0, -1) : spec.unit;
       const prefix = spec.count === 1 ? `Every ${unit}` : `Every ${spec.count} ${unit}`;
-      if (isChainedHourly(spec)) return `${prefix} at :${String(spec.minute).padStart(2, '0')}`;
+      if (isChainedHourly(spec)) return `${prefix} at minute ${String(spec.minute).padStart(2, '0')}`;
       return prefix;
     }
     case 'daily': {

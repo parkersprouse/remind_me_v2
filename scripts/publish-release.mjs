@@ -30,21 +30,40 @@ const TAURI_CONF = join(ROOT, 'src-tauri/tauri.conf.json');
 const RELEASE_AUTHOR = 'parkersprouse';
 
 function sh(cmd, args) {
-  return execFileSync(cmd, args, { cwd: ROOT, encoding: 'utf8' }).trim();
+  return execFileSync(cmd, args, {
+    cwd: ROOT,
+    encoding: 'utf8',
+  }).trim();
 }
 
 function parseArgs(argv) {
   let title;
   let tag;
   let dryRun = false;
-  for (let i = 0; i < argv.length; i++) {
+  for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '-t' || arg === '--title') title = argv[++i];
-    else if (arg === '--tag') tag = argv[++i];
-    else if (arg === '--dry-run') dryRun = true;
-    else throw new Error(`Unknown argument "${arg}".`);
+    switch (arg) {
+      case '-t':
+      case '--title': {
+        title = argv[++i];
+        break;
+      }
+      case '--tag': {
+        tag = argv[++i];
+        break;
+      }
+      case '--dry-run': {
+        dryRun = true;
+        break;
+      }
+      default: throw new Error(`Unknown argument "${arg}".`);
+    }
   }
-  return { title, tag, dryRun };
+  return {
+    dryRun,
+    tag,
+    title,
+  };
 }
 
 function currentVersion() {
@@ -91,7 +110,7 @@ function changelogBody(repo, previousTag) {
   try {
     log = sh('git', ['log', range, '--no-merges', '--reverse', '--format=%H%x1f%s']);
   } catch (err) {
-    throw new Error(`Could not read commit history for range "${range}" (is tag ${previousTag} fetched locally? try \`git fetch --tags\`).\n${err.message}`);
+    throw new Error(`Could not read commit history for range "${range}" (is tag ${previousTag} fetched locally? try \`git fetch --tags\`).\n${err.message}`, { cause: err });
   }
 
   const entries = log
@@ -99,7 +118,10 @@ function changelogBody(repo, previousTag) {
     .filter(Boolean)
     .map((line) => {
       const [sha, subject] = line.split('\x1f');
-      return { sha, subject };
+      return {
+        sha,
+        subject,
+      };
     })
     .filter(({ subject }) => !/^v\d+\.\d+\.\d+$/.test(subject.trim()))
     .map(({ sha, subject }) => `* [${subject}](https://github.com/${repo}/commit/${sha}) by @${RELEASE_AUTHOR}`);
@@ -135,7 +157,7 @@ function main() {
   console.log(`Title:           ${resolvedTitle}`);
   console.log('Assets:');
   for (const asset of assets) console.log(`  - ${relative(ROOT, asset)}`);
-  console.log('\nNotes:\n' + notes + '\n');
+  console.log(`\nNotes:\n${notes}\n`);
 
   if (dryRun) {
     console.log('(dry run — no release was created)');
@@ -153,9 +175,15 @@ function main() {
       '--title', resolvedTitle,
       '--target', targetSha,
       '--notes-file', notesPath,
-    ], { cwd: ROOT, stdio: 'inherit' });
+    ], {
+      cwd: ROOT,
+      stdio: 'inherit',
+    });
   } finally {
-    rmSync(notesDir, { recursive: true, force: true });
+    rmSync(notesDir, {
+      recursive: true,
+      force: true,
+    });
   }
 }
 
