@@ -28,22 +28,39 @@
       </div>
 
       <div v-if="type === 'interval'" class='interval-controls'>
-        <NumberPicker v-model='count' :min='1' :max='99' />
-        <div class='unit-select'>
-          <button
-            v-for='u in UNITS'
-            :key='u'
-            type='button'
-            :class='{ selected: unit === u }'
-            @click='unit = u'
-          >
-            {{ u.charAt(0).toUpperCase() + u.slice(1) }}
-          </button>
+        <div class='interval-row'>
+          <div class='unit-select'>
+            <button
+              v-for='u in UNITS'
+              :key='u'
+              type='button'
+              :class='{ selected: unit === u }'
+              @click='unit = u'
+            >
+              {{ toCapitalCase(u) }}
+            </button>
+          </div>
+          <div class='unit-column'>
+            <span class='unit-label'>{{ toCapitalCase(unit) }}</span>
+            <NumberPicker v-model='count' :min='1' :max='99' />
+          </div>
+          <div v-if="unit === 'hours'" class='unit-column'>
+            <span class='unit-label'>At minute</span>
+            <NumberPicker v-model='minute' :min='0' :max='59' />
+          </div>
         </div>
       </div>
 
       <div v-else class='calendar-controls'>
         <div class='row-select'>
+          <button
+            type='button'
+            class='chip chip-pill'
+            :class="{ selected: cal_kind === 'daily' }"
+            @click="cal_kind = 'daily'"
+          >
+            Daily
+          </button>
           <button
             type='button'
             class='chip chip-pill'
@@ -89,12 +106,11 @@
           </button>
         </div>
 
-        <div v-else class='day-row'>
-          <span class='day-label'>Day of month</span>
-          <NumberPicker v-model='day' :min='1' :max='28' />
-        </div>
-
         <div class='time-row'>
+          <div v-if="cal_kind === 'monthly'" class='day-row'>
+            <span class='day-label'>Day of month</span>
+            <NumberPicker v-model='day' :min='1' :max='28' />
+          </div>
           <button type='button' class='chip' title='Repeat Time' @click='show_time_picker = true'>
             <i class='fa-regular fa-clock chip-avatar' aria-hidden='true'/>
             {{ formatTimeOfDay(hour, minute) }}
@@ -118,23 +134,24 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-
 import LabeledSwitch from '~components/LabeledSwitch.vue';
 import NumberPicker from '~components/NumberPicker.vue';
 import TimePickerDialog from '~components/TimePickerDialog.vue';
 import { formatTimeOfDay } from '~lib/format.ts';
 import { describeRepeat, ordinal } from '~lib/repeat.ts';
+import { toCapitalCase } from '~lib/util.ts';
 
 import type { IntervalUnit, RepeatSpec } from '~lib/repeat.ts';
 
 /**
  * Repeat rule editor embedded in ReminderForm. Off/on switch; when on, the
- * rule is either "Every N units" (interval) or "On a schedule" (weekly /
- * monthly calendar rule with an every-Nth multiplier and a time of day).
+ * rule is either "Every N units" (interval — minutes, or hours aligned to a
+ * chosen minute-of-hour) or "On a schedule" (daily / weekly / monthly
+ * calendar rule with an every-Nth multiplier and a time of day).
  */
 const model = defineModel<RepeatSpec | null>({ required: true });
 
-const UNITS: IntervalUnit[] = ['minutes', 'hours', 'days', 'weeks', 'months'];
+const UNITS: IntervalUnit[] = ['minutes', 'hours'];
 const MULTIPLIERS = [1, 2, 3, 4, 5, 6];
 const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -143,8 +160,12 @@ const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const now = new Date();
 const type = ref<'interval' | 'calendar'>('interval');
 const count = ref(1);
-const unit = ref<IntervalUnit>('days');
-const cal_kind = ref<'weekly' | 'monthly'>('weekly');
+// Broader than UNITS: a reminder created before this picker dropped days /
+// weeks / months keeps whatever legacy unit it has until the user actively
+// picks a new one (see buildSpec) — the buttons above just won't show any
+// of them as selected.
+const unit = ref<IntervalUnit>('minutes');
+const cal_kind = ref<'daily' | 'weekly' | 'monthly'>('daily');
 const every = ref(1);
 const weekday = ref(now.getDay() + 1); // 1=Sunday, matching the spec
 const day = ref(Math.min(now.getDate(), 28));
@@ -160,6 +181,7 @@ if (initial !== null) {
     type.value = 'interval';
     count.value = initial.count;
     unit.value = initial.unit;
+    if (initial.unit === 'hours' && initial.minute !== undefined) minute.value = initial.minute;
   } else {
     type.value = 'calendar';
     cal_kind.value = initial.kind;
@@ -167,16 +189,32 @@ if (initial !== null) {
     hour.value = initial.hour;
     minute.value = initial.minute;
     if (initial.kind === 'weekly') weekday.value = initial.weekday;
-    else day.value = initial.day;
+    else if (initial.kind === 'monthly') day.value = initial.day;
   }
 }
 
 function buildSpec(): RepeatSpec {
   if (type.value === 'interval') {
+    if (unit.value === 'hours') {
+      return {
+        kind: 'interval',
+        count: count.value,
+        unit: 'hours',
+        minute: minute.value,
+      };
+    }
     return {
       kind: 'interval',
       count: count.value,
       unit: unit.value,
+    };
+  }
+  if (cal_kind.value === 'daily') {
+    return {
+      kind: 'daily',
+      every: every.value,
+      hour: hour.value,
+      minute: minute.value,
     };
   }
   if (cal_kind.value === 'weekly') {
@@ -247,11 +285,12 @@ const summary = computed(() => (model.value === null ? '' : describeRepeat(model
   border-color: var(--secondary-container);
 }
 
-.interval-controls {
+.interval-row {
   display: flex;
   align-items: center;
-  justify-content: space-evenly;
+  justify-content: center;
   gap: 16px;
+  margin-bottom: 12px;
 }
 
 .unit-select {
@@ -266,7 +305,7 @@ const summary = computed(() => (model.value === null ? '' : describeRepeat(model
   font-size: 15px;
   font-weight: 500;
   color: var(--on-surface);
-  text-align: left;
+  text-align: center;
 }
 
 .unit-select button.selected {
@@ -308,10 +347,23 @@ const summary = computed(() => (model.value === null ? '' : describeRepeat(model
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 8px;
   margin-bottom: 12px;
 }
 
+.unit-column {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.unit-label,
 .day-label {
   color: var(--on-surface-variant);
   font-size: 14px;
@@ -320,6 +372,8 @@ const summary = computed(() => (model.value === null ? '' : describeRepeat(model
 .time-row {
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 16px;
 }
 
 .summary {

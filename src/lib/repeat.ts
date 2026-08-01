@@ -6,18 +6,27 @@ import { formatTimeOfDay } from '~lib/format.ts';
  * Repeat rules for reminders, serialized as JSON into the `repeat` column.
  *
  * Mapping onto the notification plugin (verified against its Android source):
- * - `interval` → `Schedule.every(unit, count)`: AlarmManager.setRepeating
+ * - `interval` with unit `minutes`, or `hours` with no `minute` set (legacy
+ *   data — see below) → `Schedule.every(unit, count)`: AlarmManager.setRepeating
  *   anchored at now + interval. Inexact by design (the OS batches repeating
- *   alarms) and `months` is approximated as 30 days — both acceptable for
- *   "every N units from now" semantics.
- * - `weekly`/`monthly` with `every === 1` → `Schedule.interval(DateMatch)`:
+ *   alarms and always anchors the first fire to "now", never a wall-clock
+ *   target) — acceptable for plain "every N units from now" semantics.
+ * - `daily`/`weekly`/`monthly` with `every === 1` → `Schedule.interval(DateMatch)`:
  *   an exact alarm for the next wall-clock match that the plugin's broadcast
  *   receiver re-arms itself after each fire. Works with the app process dead.
- * - `weekly`/`monthly` with `every > 1` → the plugin has no primitive for
- *   "every 2nd Tuesday" (setRepeating can't be anchored to a wall-clock
- *   target), so these are CHAINED: an exact one-shot `Schedule.at` for the
- *   next occurrence, re-armed by the app on launch and on delivery. `anchor`
- *   pins the first occurrence so "on" cycles stay stable across re-arms.
+ * - `daily`/`weekly`/`monthly` with `every > 1`, and `interval` with unit
+ *   `hours` + a `minute` set → the plugin has no primitive for "every 2nd
+ *   Tuesday" or "every 3 hours, aligned to :15" (setRepeating can't be
+ *   anchored to a wall-clock target), so these are CHAINED: an exact one-shot
+ *   `Schedule.at` for the next occurrence, re-armed by the app on launch and
+ *   on delivery. `anchor` pins the first occurrence so cycles stay stable
+ *   across re-arms.
+ *
+ * `days`/`weeks`/`months` interval units, and a bare `hours` interval with no
+ * `minute`, are legacy shapes the "Every…" picker no longer creates (daily
+ * and larger cycles now live under "On a schedule", and hourly intervals
+ * always carry a minute-of-hour alignment) — kept here so reminders created
+ * before that change keep scheduling and displaying correctly.
  */
 export type IntervalUnit = 'minutes' | 'hours' | 'days' | 'weeks' | 'months';
 
@@ -26,6 +35,20 @@ export type RepeatSpec =
     kind: 'interval';
     count: number;
     unit: IntervalUnit;
+    /** Minute past the hour to align fires to. Only meaningful (and only
+       *  ever set by the picker) when `unit === 'hours'`; its presence is
+       *  what makes an hourly interval chained instead of a native repeat. */
+    minute?: number;
+    /** Epoch millis of the first occurrence; set when scheduled (chained hourly only). */
+    anchor?: number;
+  } |
+  {
+    kind: 'daily';
+    every: number;
+    hour: number;
+    minute: number;
+    /** Epoch millis of the first occurrence; set when scheduled. */
+    anchor?: number;
   } |
   {
     kind: 'weekly';
@@ -84,7 +107,12 @@ export function parseRepeat(json: string | null): RepeatSpec | null {
   if (json === null || json === '') return null;
   try {
     const value = JSON.parse(json) as { kind?: string; };
-    if (value.kind === 'interval' || value.kind === 'weekly' || value.kind === 'monthly') {
+    if (
+      value.kind === 'interval' ||
+      value.kind === 'daily' ||
+      value.kind === 'weekly' ||
+      value.kind === 'monthly'
+    ) {
       return value as RepeatSpec;
     }
     return null;
@@ -93,9 +121,15 @@ export function parseRepeat(json: string | null): RepeatSpec | null {
   }
 }
 
+/** An hourly interval only chains when it carries a minute-of-hour alignment. */
+function isChainedHourly(spec: Extract<RepeatSpec, { kind: 'interval'; }>): boolean {
+  return spec.unit === 'hours' && spec.minute !== undefined;
+}
+
 /** Chained specs need the app to re-arm the next occurrence after each fire. */
 export function isChained(spec: RepeatSpec): boolean {
-  return spec.kind !== 'interval' && spec.every > 1;
+  if (spec.kind === 'interval') return isChainedHourly(spec);
+  return spec.every > 1;
 }
 
 export function ordinal(n: number): string {
@@ -107,12 +141,18 @@ export function ordinal(n: number): string {
   return `${n}th`;
 }
 
-/** "Every 15 minutes", "Every Tuesday at 9:00 AM", "Every 2nd Tuesday at 9:00 AM". */
+/** "Every 15 minutes", "Every 3 hours at :15", "Every Tuesday at 9:00 AM", "Every 2nd Tuesday at 9:00 AM". */
 export function describeRepeat(spec: RepeatSpec): string {
   switch (spec.kind) {
     case 'interval': {
       const unit = spec.count === 1 ? spec.unit.slice(0, -1) : spec.unit;
-      return spec.count === 1 ? `Every ${unit}` : `Every ${spec.count} ${unit}`;
+      const prefix = spec.count === 1 ? `Every ${unit}` : `Every ${spec.count} ${unit}`;
+      if (isChainedHourly(spec)) return `${prefix} at minute ${String(spec.minute).padStart(2, '0')}`;
+      return prefix;
+    }
+    case 'daily': {
+      const prefix = spec.every === 1 ? 'Daily' : `Every ${ordinal(spec.every)} day`;
+      return `${prefix} at ${formatTimeOfDay(spec.hour, spec.minute)}`;
     }
     case 'weekly': {
       const day = WEEKDAY_NAMES[spec.weekday - 1];
@@ -127,6 +167,22 @@ export function describeRepeat(spec: RepeatSpec): string {
     }
     // no default
   }
+}
+
+/** Next minute-of-hour match strictly after `after` (chained hourly interval). */
+function nextHourlyMatch(spec: Extract<RepeatSpec, { kind: 'interval'; }>, after: Date): Date {
+  const d = new Date(after);
+  d.setMinutes(spec.minute ?? 0, 0, 0);
+  if (d.getTime() <= after.getTime()) d.setHours(d.getHours() + 1);
+  return d;
+}
+
+/** Next day/time match strictly after `after`. */
+function nextDailyMatch(spec: Extract<RepeatSpec, { kind: 'daily'; }>, after: Date): Date {
+  const d = new Date(after);
+  d.setHours(spec.hour, spec.minute, 0, 0);
+  if (d.getTime() <= after.getTime()) d.setDate(d.getDate() + 1);
+  return d;
 }
 
 /** Next weekday/time match strictly after `after`. */
@@ -150,28 +206,37 @@ function nextMonthlyMatch(spec: Extract<RepeatSpec, { kind: 'monthly'; }>, after
 }
 
 /**
- * Next occurrence of a chained (every > 1) rule strictly after `after`:
- * steps whole cycles from the anchor using local-calendar arithmetic so the
- * wall-clock time survives DST shifts.
+ * Next occurrence of a chained hourly interval (`every > 1` isn't the trigger
+ * here — any minute-aligned hourly interval chains) strictly after `after`:
+ * steps whole `count`-hour cycles from the anchor.
+ */
+function nextChainedHourly(spec: Extract<RepeatSpec, { kind: 'interval'; }>, after: Date): Date {
+  if (spec.anchor === undefined) return nextHourlyMatch(spec, after);
+  const d = new Date(spec.anchor);
+  while (d.getTime() <= after.getTime()) d.setHours(d.getHours() + spec.count);
+  return d;
+}
+
+/**
+ * Next occurrence of a chained (every > 1) calendar rule strictly after
+ * `after`: steps whole cycles from the anchor using local-calendar
+ * arithmetic so the wall-clock time survives DST shifts.
  */
 function nextChainedOccurrence(
-  spec: Extract<RepeatSpec, { kind: 'weekly' | 'monthly'; }>,
+  spec: Extract<RepeatSpec, { kind: 'daily' | 'weekly' | 'monthly'; }>,
   after: Date,
 ): Date {
   const anchor_epoch = spec.anchor;
   if (anchor_epoch === undefined) {
-    // No anchor yet — the first occurrence is the plain next match.
+    if (spec.kind === 'daily') return nextDailyMatch(spec, after);
     return spec.kind === 'weekly' ? nextWeeklyMatch(spec, after) : nextMonthlyMatch(spec, after);
   }
 
-  const anchor = new Date(anchor_epoch);
-  const d = new Date(anchor);
+  const d = new Date(anchor_epoch);
   while (d.getTime() <= after.getTime()) {
-    if (spec.kind === 'weekly') {
-      d.setDate(d.getDate() + 7 * spec.every);
-    } else {
-      d.setMonth(d.getMonth() + spec.every);
-    }
+    if (spec.kind === 'daily') d.setDate(d.getDate() + spec.every);
+    else if (spec.kind === 'weekly') d.setDate(d.getDate() + 7 * spec.every);
+    else d.setMonth(d.getMonth() + spec.every);
   }
   return d;
 }
@@ -180,7 +245,10 @@ function nextChainedOccurrence(
 export function nextOccurrence(spec: RepeatSpec, after: Date): Date {
   switch (spec.kind) {
     case 'interval':
+      if (isChainedHourly(spec)) return nextChainedHourly(spec, after);
       return new Date(after.getTime() + spec.count * INTERVAL_UNIT_MILLIS[spec.unit]);
+    case 'daily':
+      return spec.every === 1 ? nextDailyMatch(spec, after) : nextChainedOccurrence(spec, after);
     case 'weekly':
       return spec.every === 1 ? nextWeeklyMatch(spec, after) : nextChainedOccurrence(spec, after);
     case 'monthly':
@@ -194,8 +262,7 @@ export function nextOccurrence(spec: RepeatSpec, after: Date): Date {
  * one yet. Called when a reminder is (re)scheduled so edits recompute cycles.
  */
 export function withAnchor(spec: RepeatSpec, from: Date): RepeatSpec {
-  if (!isChained(spec) || spec.kind === 'interval') return spec;
-  if (spec.anchor !== undefined) return spec;
+  if (!isChained(spec) || spec.anchor !== undefined) return spec;
   return {
     ...spec,
     anchor: nextOccurrence(spec, from).getTime(),
@@ -212,12 +279,39 @@ export interface RepeatSchedule {
 /** Map a repeat rule to the plugin schedule for its next cycle. */
 export function toSchedule(spec: RepeatSpec, from: Date): RepeatSchedule {
   switch (spec.kind) {
-    case 'interval':
+    case 'interval': {
+      if (isChainedHourly(spec)) {
+        const next = nextChainedHourly(spec, from);
+        return {
+          schedule: Schedule.at(next, false, true),
+          nextEpochMillis: next.getTime(),
+          chained: true,
+        };
+      }
       return {
         schedule: Schedule.every(INTERVAL_UNIT_TO_EVERY[spec.unit], spec.count, true),
         nextEpochMillis: nextOccurrence(spec, from).getTime(),
         chained: false,
       };
+    }
+    case 'daily': {
+      if (spec.every === 1) {
+        return {
+          schedule: Schedule.interval({
+            hour: spec.hour,
+            minute: spec.minute,
+          }, true),
+          nextEpochMillis: nextDailyMatch(spec, from).getTime(),
+          chained: false,
+        };
+      }
+      const next = nextChainedOccurrence(spec, from);
+      return {
+        schedule: Schedule.at(next, false, true),
+        nextEpochMillis: next.getTime(),
+        chained: true,
+      };
+    }
     case 'weekly': {
       if (spec.every === 1) {
         return {
