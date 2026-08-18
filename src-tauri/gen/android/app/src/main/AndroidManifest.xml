@@ -35,6 +35,28 @@
                 <!-- AndroidTV support -->
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
+
+            <!-- External reminder creation, phase 1 (PLAN.md): a
+                 remindme://create deep link, from another app, a URL, or a
+                 launcher shortcut (phase 2). BROWSABLE lets a plain <a>
+                 link/browser address bar trigger it too. Handled in
+                 MainActivity.kt via the same replay-guarded, retry-until-ready
+                 delivery as a notification action tap. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="remindme" android:host="create" />
+            </intent-filter>
+
+            <!-- Share-sheet target: "share text -> Remind Me!" from any app.
+                 Arrives with no time set, so it always prefills rather than
+                 auto-creating (see MainActivity.kt / src/lib/createRequest.ts). -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <!-- Preset snooze buttons are registered with `foreground: false`, so

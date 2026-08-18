@@ -7,6 +7,7 @@ import { createApp } from 'vue';
 
 import App from '@/App.vue';
 import { registerAndroidBackHandler } from '~lib/androidBack.ts';
+import { registerCreateRequestBridge } from '~lib/createRequest.ts';
 import { notification_manager } from '~lib/notifications.ts';
 import { useSettingsStore } from '~stores/settings.ts';
 
@@ -24,6 +25,9 @@ registerAndroidBackHandler();
 void (async () => {
   await useSettingsStore().load();
   await notification_manager.init();
+  // Needs settings (for scheduling) and notifications (for the channel)
+  // ready before a fully-specified deep link is allowed to auto-create.
+  registerCreateRequestBridge();
   // Before cleanExpired: a background snooze that already fired while the app
   // was closed needs its row present for the sweep to reason about it.
   await notification_manager.drainSnoozeJournal();

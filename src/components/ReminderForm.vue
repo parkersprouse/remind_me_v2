@@ -152,7 +152,25 @@ function submit(): void {
   emit('submit', form.details, date_time.value, repeat.value);
 }
 
-defineExpose({ reset });
+/**
+ * Applies an externally-supplied create request (see src/lib/createRequest.ts):
+ * fills details and, when a time came with it, the date/time chips too. Always
+ * clears any in-progress repeat rule — an external request can't express one.
+ */
+function prefill(details: string, dateTime?: Date): void {
+  form.details = details;
+  if (dateTime !== undefined) {
+    form.date = new Date(dateTime);
+    form.hour = dateTime.getHours();
+    form.minute = dateTime.getMinutes();
+  }
+  repeat.value = null;
+}
+
+defineExpose({
+  prefill,
+  reset,
+});
 </script>
 
 <style scoped>

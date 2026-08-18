@@ -5,12 +5,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 
 import ReminderForm from '~components/ReminderForm.vue';
+import { prefill_request } from '~lib/createRequest.ts';
 import { notification_manager } from '~lib/notifications.ts';
 import { ERROR_TOAST, SUCCESS_TOAST, toaster } from '~lib/toaster.ts';
 
+import type { PrefillRequest } from '~lib/createRequest.ts';
 import type { RepeatSpec } from '~lib/repeat.ts';
 
 /**
@@ -18,6 +20,23 @@ import type { RepeatSpec } from '~lib/repeat.ts';
  * schedules a fresh reminder on submit.
  */
 const form_ref = ref<InstanceType<typeof ReminderForm> | null>(null);
+
+/**
+ * Applies a pending external create request (deep link / share, see
+ * createRequest.ts) to the form. Checked on mount, not just watched — a
+ * request set before this tab was ever rendered (e.g. the app cold-started
+ * on the landing page) would otherwise never be picked up.
+ */
+function applyPrefill(request: PrefillRequest | null): void {
+  if (request === null) return;
+  form_ref.value?.prefill(request.details, request.dateTime);
+  prefill_request.value = null;
+}
+
+onMounted(() => {
+  applyPrefill(prefill_request.value);
+});
+watch(prefill_request, applyPrefill);
 
 async function schedule(details: string, dateTime: Date, repeat: RepeatSpec | null): Promise<void> {
   try {

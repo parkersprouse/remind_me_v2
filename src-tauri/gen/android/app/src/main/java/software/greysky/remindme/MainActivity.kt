@@ -17,9 +17,24 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
+import java.time.Instant
 import org.json.JSONObject
 
 private const val HANDLED_ACTION_KEY = "handledNotificationAction"
+
+/**
+ * A `remindme://create` deep link or ACTION_SEND share-text hand-off, parsed
+ * from the launching intent (PLAN.md, phase 1). `replayKey` is what makes the
+ * request idempotent across a replayed intent (see fingerprint()) — the full
+ * URI for a deep link (a caller-supplied `key` query param just rides along
+ * as part of it), or the shared text itself for a share.
+ */
+private data class CreateRequest(
+  val details: String?,
+  val atMillis: Long?,
+  val source: String,
+  val replayKey: String,
+)
 
 // Arbitrary but distinctive request codes for the backup document pickers;
 // results for codes we don't own fall through to super (Tauri plugins).
@@ -45,6 +60,14 @@ class MainActivity : TauriActivity() {
 
   /** Fingerprint ("id|actionId") of the action already delivered by this task. */
   private var handledActionFingerprint: String? = null
+
+  /**
+   * Create request (deep link / share) waiting to be handed to the frontend
+   * as `window.androidCreateRequest(request)`. Same cold-start problem as a
+   * notification action tap — a caller-launched intent can just as easily
+   * arrive before the webview exists — so it gets the same retry treatment.
+   */
+  private var pendingCreateRequest: CreateRequest? = null
 
   /** Backup JSON waiting for the user to pick a destination in the SAF dialog. */
   private var pendingExportJson: String? = null
@@ -110,12 +133,12 @@ class MainActivity : TauriActivity() {
     val currentFingerprint = fingerprint(intent)
     val alreadyHandled =
       currentFingerprint != null && savedInstanceState?.getString(HANDLED_ACTION_KEY) == currentFingerprint
-    if (!fromHistory && !alreadyHandled) captureNotificationAction(intent)
+    if (!fromHistory && !alreadyHandled) captureIncomingIntent(intent)
   }
 
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
-    captureNotificationAction(intent)
+    captureIncomingIntent(intent)
   }
 
   /**
@@ -308,8 +331,47 @@ class MainActivity : TauriActivity() {
     return Pair(id, actionId)
   }
 
+  /**
+   * Parses a `remindme://create` deep link or an ACTION_SEND text/plain
+   * share intent into a create request; null for anything else (including a
+   * notification action intent, handled separately by extractAction).
+   */
+  private fun extractCreateRequest(intent: Intent?): CreateRequest? {
+    if (intent == null) return null
+    return when (intent.action) {
+      Intent.ACTION_VIEW -> {
+        val uri = intent.data ?: return null
+        if (uri.scheme != "remindme" || uri.host != "create") return null
+        val details = uri.getQueryParameter("details")
+        val atMillis = uri.getQueryParameter("at")?.let {
+          runCatching { Instant.parse(it).toEpochMilli() }.getOrNull()
+        }
+        CreateRequest(details, atMillis, "deeplink", uri.toString())
+      }
+      Intent.ACTION_SEND -> {
+        if (intent.type != "text/plain") return null
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return null
+        CreateRequest(text, null, "share", "share:$text")
+      }
+      else -> null
+    }
+  }
+
   private fun fingerprint(intent: Intent?): String? =
     extractAction(intent)?.let { (id, actionId) -> "$id|$actionId" }
+      ?: extractCreateRequest(intent)?.replayKey
+
+  /**
+   * Single entry point for both onCreate and onNewIntent: an incoming intent
+   * is either a notification action tap or a create request, never both.
+   */
+  private fun captureIncomingIntent(intent: Intent?) {
+    if (extractAction(intent) != null) {
+      captureNotificationAction(intent)
+    } else {
+      captureCreateRequest(intent)
+    }
+  }
 
   private fun captureNotificationAction(intent: Intent?) {
     val action = extractAction(intent) ?: return
@@ -336,6 +398,41 @@ class MainActivity : TauriActivity() {
     ) { handled ->
       if (handled == "true") {
         pendingNotificationAction = null
+      } else {
+        Handler(Looper.getMainLooper()).postDelayed(retry, 250)
+      }
+    }
+  }
+
+  private fun captureCreateRequest(intent: Intent?) {
+    val request = extractCreateRequest(intent) ?: return
+    handledActionFingerprint = request.replayKey
+    pendingCreateRequest = request
+    deliverCreateRequest(0)
+  }
+
+  private fun deliverCreateRequest(attempt: Int) {
+    val request = pendingCreateRequest ?: return
+    if (attempt > 80) { // Frontend never came up; give up after ~20s.
+      pendingCreateRequest = null
+      return
+    }
+    val retry = Runnable { deliverCreateRequest(attempt + 1) }
+    val wv = webView
+    if (wv == null) {
+      Handler(Looper.getMainLooper()).postDelayed(retry, 250)
+      return
+    }
+    val payload = JSONObject().apply {
+      put("details", request.details ?: JSONObject.NULL)
+      put("atMillis", request.atMillis ?: JSONObject.NULL)
+      put("source", request.source)
+    }
+    wv.evaluateJavascript(
+      "window.androidCreateRequest ? window.androidCreateRequest($payload) : false"
+    ) { handled ->
+      if (handled == "true") {
+        pendingCreateRequest = null
       } else {
         Handler(Looper.getMainLooper()).postDelayed(retry, 250)
       }

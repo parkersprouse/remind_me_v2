@@ -1,8 +1,8 @@
 # Plan: external reminder creation & home screen widgets
 
-Two prospective feature areas, broken into shippable phases. Nothing here is
-committed to yet — this is the design and cost assessment, written down so the
-decisions and their reasoning survive.
+Two prospective feature areas, broken into shippable phases. Beyond phase 1
+(done — see below), nothing here is committed to yet; this is the design and
+cost assessment, written down so the decisions and their reasoning survive.
 
 **Neither feature needs a Rust change.** `src-tauri/src/lib.rs` stays plugin
 wiring plus the SQLite migration; all of this is Kotlin in the hand-edited
@@ -14,13 +14,13 @@ is consistent with existing practice — but it is more surface that
 
 ## Phases at a glance
 
-| # | Phase | Size | Depends on |
-|---|---|---|---|
-| 1 | Deep link + share target (foreground creation) | small | — |
-| 2 | App shortcuts | hours | 1 |
-| 3 | Headless creation broadcast | medium | 1 |
-| 4 | Quick-create widget | small | 3 |
-| 5 | Reminder list widget | medium | — |
+| # | Phase | Size | Depends on | Status |
+|---|---|---|---|---|
+| 1 | Deep link + share target (foreground creation) | small | — | **Done** |
+| 2 | App shortcuts | hours | 1 | not started |
+| 3 | Headless creation broadcast | medium | 1 | not started |
+| 4 | Quick-create widget | small | 3 | not started |
+| 5 | Reminder list widget | medium | — | not started |
 
 Recommended order is 1 → 2 → 3 → 4 → 5. Phases 1–2 deliver most of the
 practical "create a reminder fast" value for a fraction of a widget's cost;
@@ -92,6 +92,38 @@ time always falls back to prefill.
 
 **Small — about half a day.** Most of it is the replay guard and the
 auto-create-vs-confirm decision, not the intent plumbing.
+
+### Result — done
+
+Shipped as designed above, including the auto-create-vs-confirm split under
+"Open decision" (which is no longer open: implemented exactly as
+recommended, gated additionally on notification permission being granted —
+ungranted falls back to prefill rather than arming an alarm the user can't
+yet see). The frontend module landed as `src/lib/createRequest.ts`; the
+prefill path runs through a new `ReminderForm.prefill()` method and
+`NewReminderTab.vue` (not `App.vue` — the router alone was enough, no app-shell
+change needed).
+
+Emulator-verified end-to-end (WebView CDP + direct `reminders.db` queries):
+a fully-specified deep link inserts a row and arms the alarm with no form
+interaction; a deep link missing `at`, or one that arrives before
+notifications are granted, prefills instead; a share-sheet `ACTION_SEND`
+always prefills. All three intent filters resolve per `dumpsys package`.
+
+Two environment gotchas surfaced during verification, unrelated to the
+feature itself but worth keeping in mind next time:
+
+- `pnpm tauri android build` picks Android Studio's bundled JBR (Java 25) by
+  default when `JAVA_HOME` is unset, which fails Gradle's `:buildSrc`
+  configuration with a cryptic `> 25.0.2` error. Fix: export
+  `JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`
+  before building.
+- `adb shell 'am start ... -d "remindme://create?details=x&at=y"'` silently
+  truncates at the `&`: adb joins argv into one string and hands it to the
+  *device's* shell, which treats an unescaped `&` as a background operator.
+  Wrap the whole `-d` value in single quotes inside the outer double-quoted
+  command, e.g. `adb shell "am start -a android.intent.action.VIEW -d
+  'remindme://create?details=x&at=y'"`.
 
 ---
 
