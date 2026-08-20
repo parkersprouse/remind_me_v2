@@ -3,7 +3,6 @@ import {
   requestPermission,
   registerActionTypes,
   onNotificationReceived,
-  active as activeNotifications,
   cancel as cancelPending,
   createChannel,
   Importance,
@@ -495,10 +494,39 @@ function syncNotificationActionGroup(actionTypeId: string | null): void {
   window.AndroidNative?.setNotificationActionGroup(actionTypeId ?? '');
 }
 
+/**
+ * Shapes get_active can resolve to. Android has no Rust command backing
+ * `get_active`, so the invoke is forwarded straight to the Kotlin plugin and
+ * its `JSArray` return value is serialized by reflection over the org.json
+ * internals — `{ values: [{ nameValuePairs: { id, … } }] }` — rather than as
+ * the `ActiveNotification[]` the plugin's type declarations promise. The
+ * plain-array arm is kept so a future plugin fix doesn't silently regress
+ * this back to sweeping everything.
+ */
+interface RawActive {
+  values?: { nameValuePairs?: { id?: unknown; }; }[];
+}
+
 /** Ids of notifications currently visible in the drawer. */
 async function activeNotificationIds(): Promise<Set<number>> {
   try {
-    return new Set((await activeNotifications()).map((notification) => notification.id));
+    // Invoked directly rather than through the plugin's active() wrapper: that
+    // wrapper types the raw payload above as ActiveNotification[], so .map()
+    // over it throws and every launch swept reminders whose notification was
+    // still on screen (dismissing it, snooze buttons and all). Same reason
+    // permissions.status() bypasses isPermissionGranted().
+    const raw = await invoke<RawActive | { id?: unknown; }[]>('plugin:notification|get_active');
+    const entries =
+      Array.isArray(raw) ?
+        raw.map((notification) => notification.id) :
+        (raw.values ?? []).map((notification) => notification.nameValuePairs?.id);
+
+    // Coerced rather than trusted: an id arriving as a string would miss every
+    // Set lookup without throwing, which is the original bug wearing a disguise.
+    // `> 0` and not just isInteger: Number(null) is 0, so a malformed entry
+    // would otherwise seed the Set with an id-shaped value (randomId() is
+    // `% MAX_INT` of a positive draw, so real ids are always positive).
+    return new Set(entries.map(Number).filter((id) => Number.isInteger(id) && id > 0));
   } catch {
     return new Set(); // Query failed — fall back to sweeping everything.
   }
