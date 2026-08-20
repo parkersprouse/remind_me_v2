@@ -34,6 +34,9 @@ private const val PAST_GRACE_MILLIS = 60_000L
 /** Upper bound on how far out a reminder may be armed (~10 years). */
 private const val MAX_FUTURE_MILLIS = 10L * 365 * 24 * 60 * 60 * 1000
 
+/** Mirrors the intent filter in AndroidManifest.xml; keep the two in sync. */
+const val ACTION_CREATE_REMINDER = "software.greysky.remindme.CREATE_REMINDER"
+
 const val EXTRA_DETAILS = "details"
 const val EXTRA_FIRE_AT = "fireAt"
 const val EXTRA_IN_MINUTES = "inMinutes"

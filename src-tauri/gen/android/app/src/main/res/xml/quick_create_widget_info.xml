@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Quick-create widget metadata (PLAN.md, phase 4), pointed at by the
+     android.appwidget.provider meta-data on QuickCreateWidgetProvider in
+     AndroidManifest.xml.
+
+     updatePeriodMillis is 0 on purpose: nothing here needs periodic refresh
+     (the widget repaints on tap), and the platform's 30-minute floor would
+     only wake the process to do nothing. targetCellWidth/Height, previewLayout
+     and description are API 31+ and are ignored below it — minWidth/minHeight
+     still size the widget there, and the picker falls back to the app icon. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_quick_create"
+    android:previewLayout="@layout/widget_quick_create"
+    android:description="@string/widget_description"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen" />

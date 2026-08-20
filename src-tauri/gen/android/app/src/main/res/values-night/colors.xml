@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Night overrides for the quick-create widget's surface colours (see the
+     comment in values/colors.xml). Night mode is a system-wide configuration,
+     so the launcher inflates the widget with these when the device is dark —
+     note this follows the *system* setting, not the app's own light/dark/system
+     preference, which lives in settings.json and is unreachable from
+     RemoteViews. -->
+<resources>
+    <color name="widget_background">#FF1B1B1F</color>
+    <color name="widget_text">#FFE3E2E6</color>
+</resources>

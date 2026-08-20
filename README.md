@@ -28,8 +28,13 @@ only** — there is no desktop or browser build.
 - Reminders can repeat (daily/weekly/custom interval, chained from the prior fire time),
   not just fire once.
 - Reminders can be created from outside the app: a `remindme://create` deep link, the
-  Android share sheet, a long-press launcher shortcut, or a broadcast that creates one
-  with no UI at all (see [Automation](#automation)).
+  Android share sheet, a long-press launcher shortcut, the home-screen widget, or a
+  broadcast that creates one with no UI at all (see [Automation](#automation)).
+- The **Quick reminder** home-screen widget has one-tap buttons for 15 minutes, 30
+  minutes and an hour from now — those arm the reminder without opening the app, and
+  every one of them is titled simply "Reminder", since a widget can't take text input —
+  plus a "+" button that opens the New Reminder form. Its colours follow the system
+  light/dark setting rather than the accent you picked in the app.
 - Theming is generated at runtime: pick one accent seed color and the full Material 3
   palette (light/dark) is derived from it and applied as CSS custom properties. There's no
   static authored color scheme to edit.

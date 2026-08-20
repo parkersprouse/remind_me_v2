@@ -10,4 +10,33 @@
          Mirrors the platform Clock app's "New timer" / "Create new timer". -->
     <string name="shortcut_new_reminder_short">"New reminder"</string>
     <string name="shortcut_new_reminder_long">"Create new reminder"</string>
+    <!-- Quick-create home-screen widget (PLAN.md, phase 4). -->
+    <string name="widget_label">"Quick reminder"</string>
+    <string name="widget_description">"Set a reminder for a preset time from now, without opening the app."</string>
+    <string name="widget_hint">"Remind me in\u2026"</string>
+    <!-- Past tense on purpose: the widget is only ever repainted by a tap (its
+         updatePeriodMillis is 0), so this line stays on screen long after the
+         reminder fires. A present-tense "Reminder at 5:08 PM" would go stale;
+         a record of what the last tap did does not. -->
+    <string name="widget_status_set">"Reminder set for %1$s"</string>
+    <!-- Same tap, but the alarm will fire invisibly: the reminder really is
+         armed (AlarmManager doesn't care about POST_NOTIFICATIONS), so this
+         says "set" too rather than reading as a failure. It is the state a
+         widget placed before the app was ever opened is in. -->
+    <string name="widget_status_set_muted">"Reminder set for %1$s \u2014 notifications are off"</string>
+    <!-- Preset labels mirror the app's own quick-schedule chips
+         (quickScheduleOptions in src/stores/settings.ts, formatted by
+         packageDurations). They are hardcoded rather than mirrored from the
+         setting: a widget placed before the app was ever opened must still
+         render usable buttons, so a mirror would need these defaults baked in
+         anyway, plus a bridge method, a settings watcher and a widget refresh.
+         Phase 5's snapshot bridge is where that becomes worth it. -->
+    <string name="widget_preset_15m">"15 min."</string>
+    <string name="widget_preset_30m">"30 min."</string>
+    <string name="widget_preset_1h">"1 hr."</string>
+    <!-- Body of a reminder created from a preset button. A widget cannot take
+         text input (RemoteInput is notification-only and RemoteViews has no
+         editable field), so every preset reminder carries this one body; the
+         fire time is what distinguishes them in the list. -->
+    <string name="widget_reminder_details">"Reminder"</string>
 </resources>

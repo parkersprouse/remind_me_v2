@@ -7,4 +7,15 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <!-- Quick-create widget (PLAN.md, phase 4). The widget is inflated by the
+         launcher, so it cannot see the runtime Material 3 palette the app
+         generates from the user's accent seed (src/lib/theme.ts) — these are
+         static, with a values-night variant for the surface colours. The
+         button colour is the launcher icon's background for the same reason
+         ic_shortcut_new_reminder reaches for it: it is the one brand colour
+         that lives outside the runtime palette. -->
+    <color name="widget_background">#FFFFFFFF</color>
+    <color name="widget_text">#FF1B1B1F</color>
+    <color name="widget_button">@color/ic_launcher_background</color>
+    <color name="widget_button_text">#FFFFFFFF</color>
 </resources>

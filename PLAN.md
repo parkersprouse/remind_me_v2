@@ -19,7 +19,7 @@ is consistent with existing practice — but it is more surface that
 | 1 | Deep link + share target (foreground creation) | small | — | **Done** |
 | 2 | App shortcuts | hours | 1 | **Done** |
 | 3 | Headless creation broadcast | medium | 1 | **Done** |
-| 4 | Quick-create widget | small | 3 | not started |
+| 4 | Quick-create widget | small | 3 | **Done** |
 | 5 | Reminder list widget | medium | — | not started |
 
 Recommended order is 1 → 2 → 3 → 4 → 5. Phases 1–2 deliver most of the
@@ -450,6 +450,97 @@ Once phase 3 exists this widget is nearly free: a layout, a provider, and
 `PendingIntent`s.
 
 **Estimate: small — about a day.**
+
+### Result — done
+
+Shipped as `QuickCreateWidgetProvider.kt` plus a layout, a widget-info XML and
+four small drawables — no frontend change at all, and no new capability: the
+whole feature is the phase-3 broadcast and the phase-1 deep link with a
+`RemoteViews` face on them. Preset durations are 15 / 30 / 60 minutes, matching
+`quickScheduleOptions`' defaults in `src/stores/settings.ts` rather than the
+`+15m / +1h / +3h` this sketch guessed at, so the widget shows the same
+durations as the app's own quick-schedule chips.
+
+Four things the sketch above did not anticipate:
+
+- **A silent button reads as a broken widget.** A create broadcast shows
+  nothing until the reminder fires, possibly hours later, so the taps are
+  routed *through the provider* (its own `ACTION_QUICK_CREATE`, forwarded to
+  `CreateReminderReceiver` by explicit component) rather than straight into the
+  receiver, purely so the widget can repaint a confirmation line — "Reminder
+  set for 2:31 PM", in the same hardcoded en-US `h:mm a` format
+  `src/lib/format.ts` uses. The confirmation is optimistic: a plain
+  `sendBroadcast` has no result code to read back, and a request built from the
+  preset table cannot fail validation by construction. Adding a `toast` extra
+  to `CreateReminderReceiver` instead was rejected — its contract is the
+  published automation surface (README), and a UI flag does not belong in it.
+  The one outcome worth distinguishing, notifications being disabled, the
+  provider reads for itself (`areNotificationsEnabled()`) and says so in the
+  line — the alarm is armed either way, but a bare "Reminder set" would
+  misrepresent a reminder that will fire invisibly, and that is exactly the
+  state a widget placed before the app was ever opened is in.
+- **The status line is deliberately past-tense.** `updatePeriodMillis` is 0, so
+  nothing repaints the widget between taps; a present-tense "Reminder at 2:31
+  PM" would rot, while a record of what the last tap did stays true. It resets
+  to the "Remind me in…" hint on the next `onUpdate` — reboot, app update, or
+  re-placement.
+- **`PendingIntent` identity ignores extras.** `Intent.filterEquals()` does not
+  compare them, so all three buttons (times every placed instance) would have
+  collapsed onto one `PendingIntent`, and `FLAG_UPDATE_CURRENT` would have left
+  every button doing whatever was registered last. Each button's intent carries
+  a distinct `remindme-widget://quick-create/<widgetId>/<minutes>` data URI and
+  a matching request code. This is the defect that would have survived to the
+  screenshot stage looking fine, so both of its dimensions were checked
+  explicitly: three buttons on one widget give three different durations, and
+  two placed widgets tapped on different presets each update their own status
+  line. For the same class of reason the button *labels* are painted from the
+  `PRESETS` table rather than left to the layout's `android:text` — nothing
+  ties that text to `minutes`, so changing a duration would leave the button
+  advertising the old one with no build or screenshot catching it.
+- **A widget provider must be exported**, so its click action is externally
+  reachable even though the app's own `PendingIntent`s are explicit. The
+  forwarded duration is therefore range-checked in the provider as well
+  (1 minute … 7 days), on top of `CreateReminderReceiver`'s own validation —
+  same input-validation-not-access-control posture as phase 3.
+
+The theming question resolved the way the phase-5 notes predict: `RemoteViews`
+cannot see the runtime M3 palette, so the widget uses static colours with a
+`values-night` variant and the launcher-icon blue for its buttons, exactly as
+`ic_shortcut_new_reminder` already does. That means it follows the *system*
+light/dark setting, not the app's own. Phase 5's snapshot bridge is the thing
+that would carry the accent across; it is also what would let the presets follow
+`quickScheduleOptions` instead of being hardcoded, which is why neither was
+built here — a widget placed before the app was ever opened has to render
+usable buttons anyway.
+
+### Verification — what was actually run
+
+Emulator (API 37), on debug **and** on the signed minified release APK, widget
+placed by hand from the launcher's widget picker; CDP evals do not reach
+`RemoteViews`, so this phase is screenshots.
+
+- Picker preview renders (`previewLayout`), and the widget places at 4×2.
+- Dark and light: `cmd uimode night no/yes` flips the `values-night` surface
+  colours; content is vertically centred so a resized widget does not sit in the
+  top-left corner.
+- Three preset buttons → three distinct durations logged, three alarms armed
+  (`dumpsys alarm`), and after opening the app three rows at +15 / +30 / +60
+  minutes — the journal drain treats them exactly like any other headless
+  create.
+- Two widgets placed at once, tapped on different presets: each repaints its
+  own confirmation, neither steals the other's.
+- A 1-minute reminder pushed through the provider's own action fired normally,
+  with its snooze buttons.
+- Out-of-range durations (0 and 99999 minutes) sent straight to the exported
+  provider are logged and dropped.
+- "+" opens the New Reminder tab from wherever the app was, and leaves
+  half-typed details alone — the navigate-only deep link, unchanged from
+  phase 2.
+- On the release build, freshly installed and never launched: the widget still
+  places, and the first tap works — binding the widget takes the app out of
+  Android's stopped state, so the `BOOT_COMPLETED`/`am broadcast` caveat does
+  not apply here. That tap reports "notifications are off" (no runtime
+  permission yet) and the reminder is in the list once the app is opened.
 
 ---
 

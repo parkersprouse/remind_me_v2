@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Quick-create widget backing (PLAN.md, phase 4). A widget sits on the
+     wallpaper rather than on an app surface, so it has to paint its own
+     opaque, rounded panel. The colours are static resources with a
+     values-night variant: RemoteViews cannot reach the runtime M3 palette
+     generated in src/lib/theme.ts, and the accent snapshot that would carry
+     it across is phase 5. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+  <solid android:color="@color/widget_background" />
+  <corners android:radius="24dp" />
+</shape>

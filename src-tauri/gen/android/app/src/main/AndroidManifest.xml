@@ -102,6 +102,31 @@
             </intent-filter>
         </receiver>
 
+        <!-- Quick-create home-screen widget, phase 4 (PLAN.md): preset
+             buttons that arm a reminder through CreateReminderReceiver
+             without launching the app, plus a button that opens the New
+             Reminder form via the phase-1 deep link. See
+             QuickCreateWidgetProvider.kt and res/xml/quick_create_widget_info.xml.
+
+             Exported because every app widget provider must be — the launcher
+             is a different process and has to be able to deliver
+             APPWIDGET_UPDATE. The provider's own click action deliberately has
+             no intent filter: its PendingIntents name the component
+             explicitly, so it stays off the implicit-broadcast surface, and
+             anything that did reach it is range-checked there and validated
+             again by CreateReminderReceiver. -->
+        <receiver
+            android:name=".QuickCreateWidgetProvider"
+            android:label="@string/widget_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_create_widget_info" />
+        </receiver>
+
         <provider
           android:name="androidx.core.content.FileProvider"
           android:authorities="${applicationId}.fileprovider"
