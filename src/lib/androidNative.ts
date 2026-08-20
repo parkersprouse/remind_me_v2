@@ -18,11 +18,18 @@ export interface AndroidNativeBridge {
   /** Launches the system "open document" picker and reads the chosen file. */
   importBackup: () => void;
   /**
-   * Returns (and clears) the snoozes SnoozeActionReceiver.kt performed while
-   * the frontend was not running, as a JSON array string. Synchronous, unlike
-   * the backup pickers — see drainSnoozeJournal in notifications.ts.
+   * Returns (and clears) the reminder bookkeeping the receivers performed
+   * while the frontend was not running — background snoozes and headless
+   * creates — as a JSON array string. Synchronous, unlike the backup pickers
+   * — see drainPendingOps in notifications.ts.
    */
-  takeSnoozeJournal: () => string;
+  takePendingOps: () => string;
+  /**
+   * Mirrors the registered snooze action group so CreateReminderReceiver.kt
+   * can attach the same buttons to a headlessly armed reminder. Empty string
+   * means snooze is disabled.
+   */
+  setNotificationActionGroup: (actionTypeId: string) => void;
 }
 
 declare global {

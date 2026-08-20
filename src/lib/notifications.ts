@@ -10,7 +10,7 @@ import {
   Visibility,
   Schedule,
 } from '@tauri-apps/plugin-notification';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 
 import { DB } from '~lib/db.ts';
@@ -74,16 +74,22 @@ declare global {
      */
     androidNotificationAction?: (id: number, actionId: string) => boolean;
     /**
-     * Bridge target for MainActivity.kt's SNOOZE_JOURNAL_UPDATED receiver:
-     * a background snooze just landed, so pick it up right away instead of
-     * waiting for the next resume.
+     * Bridge target for MainActivity.kt's PENDING_OPS_UPDATED receiver: a
+     * receiver just journalled a background snooze or a headless create, so
+     * pick it up right away instead of waiting for the next resume.
      */
-    androidSnoozeJournal?: () => void;
+    androidPendingOps?: () => void;
   }
 }
 
-/** One background snooze recorded by SnoozeActionReceiver.kt. */
-interface SnoozeJournalEntry {
+/** A background snooze recorded by SnoozeActionReceiver.kt. */
+interface SnoozeOp {
+  /**
+   * Absent on entries written before headless creates existed — the journal
+   * lives in SharedPreferences, which survives an app update, so an untyped
+   * entry can still turn up on the first run of a new build.
+   */
+  type?: 'snooze';
   /** Reminder whose notification carried the tapped button. */
   sourceId: number;
   /** Id the receiver armed the snoozed copy under. */
@@ -91,6 +97,18 @@ interface SnoozeJournalEntry {
   fireAt: number;
   details: string;
 }
+
+/** A reminder armed from a broadcast by CreateReminderReceiver.kt. */
+interface CreateOp {
+  type: 'create';
+  /** Id the receiver armed it under; the row must match so a re-drain is a no-op. */
+  id: number;
+  fireAt: number;
+  details: string;
+}
+
+/** One piece of reminders.db bookkeeping a receiver could not do itself. */
+type PendingOp = CreateOp | SnoozeOp;
 
 /**
  * Route a notification action tap (from the MainActivity bridge) to snooze.
@@ -173,9 +191,29 @@ export const notification_manager = {
       return true;
     };
 
-    window.androidSnoozeJournal = (): void => {
-      void notification_manager.drainSnoozeJournal();
+    window.androidPendingOps = (): void => {
+      void notification_manager.drainPendingOps();
     };
+
+    // Also mirrors the resolved action group to the native side, so a reminder
+    // armed by CreateReminderReceiver gets the same snooze buttons as one armed
+    // in-app. arm() refreshes it on every schedule; this covers an install
+    // where nothing has been scheduled yet.
+    await registerSnoozeActions();
+
+    // An in-app notification always gets a fresh registration (arm() re-runs
+    // this immediately before every notify), but a headless create can land at
+    // any moment and reads what was registered last. Without this watcher,
+    // turning snooze off would leave the buttons on a broadcast-created
+    // reminder until the next in-app schedule or app restart.
+    const settings = useSettingsStore();
+    watch(
+      () => [settings.showNotifSnooze, settings.notifSnoozeCustomButton, settings.notifSnoozeOptions],
+      () => {
+        void registerSnoozeActions();
+      },
+      { deep: true },
+    );
 
     // Keep repeating reminders rolling: when one is delivered while the app
     // is alive, advance its stored next-occurrence (and re-arm it if the
@@ -267,22 +305,24 @@ export const notification_manager = {
   },
 
   /**
-   * Apply the snoozes SnoozeActionReceiver.kt performed while the frontend was
-   * not running (app closed, or backgrounded with no webview work possible).
+   * Apply the reminder bookkeeping the receivers performed while the frontend
+   * was not running (app closed, or backgrounded with no webview work
+   * possible): a background snooze (SnoozeActionReceiver.kt) or a headless
+   * create (CreateReminderReceiver.kt).
    *
    * The OS alarm is already armed by the time an entry lands in the journal —
    * that half has to happen natively, since the reminder must fire even if the
    * app is never opened again. This is the other half: bringing reminders.db in
-   * line, using exactly the rules snooze() applies in-app, so a background
-   * snooze and an in-app one leave identical state behind.
+   * line, using exactly the rules the equivalent in-app operation applies, so
+   * the two leave identical state behind.
    */
-  async drainSnoozeJournal(): Promise<void> {
-    const raw = window.AndroidNative?.takeSnoozeJournal();
+  async drainPendingOps(): Promise<void> {
+    const raw = window.AndroidNative?.takePendingOps();
     if (raw === undefined || raw === '') return;
 
-    let entries: SnoozeJournalEntry[];
+    let entries: PendingOp[];
     try {
-      entries = JSON.parse(raw) as SnoozeJournalEntry[];
+      entries = JSON.parse(raw) as PendingOp[];
     } catch {
       return; // Corrupt journal: the alarms are armed regardless.
     }
@@ -291,6 +331,13 @@ export const notification_manager = {
     // Sequential, in write order: snoozing a snoozed reminder makes the next
     // entry's source the previous entry's copy.
     for (const entry of entries) {
+      if (entry.type === 'create') {
+        // Headless creates are one-shots by contract (no repeat rule can reach
+        // the receiver), and the row is keyed on the id it armed. No timezone
+        // travels with a broadcast, so DB.insert falls back to the current one.
+        await DB.insert(entry.id, entry.details, entry.fireAt);
+        continue;
+      }
       const source = await DB.getById(entry.sourceId);
       // A one-shot is replaced by its snoozed copy; a repeating reminder keeps
       // its rule and the copy just joins it (cancelling would kill the
@@ -406,7 +453,10 @@ function randomId(): number {
  */
 async function registerSnoozeActions(): Promise<string | null> {
   const settings = useSettingsStore();
-  if (!settings.showNotifSnooze) return null;
+  if (!settings.showNotifSnooze) {
+    syncNotificationActionGroup(null);
+    return null;
+  }
 
   // The visible presets already account for the custom button claiming a slot;
   // append the custom action only when the setting enables it.
@@ -432,7 +482,17 @@ async function registerSnoozeActions(): Promise<string | null> {
     id: ACTION_TYPE_ID,
     actions,
   }]);
+  syncNotificationActionGroup(ACTION_TYPE_ID);
   return ACTION_TYPE_ID;
+}
+
+/**
+ * Mirror the action group to the native side for CreateReminderReceiver.kt,
+ * which arms reminders with no notification to copy one from (see
+ * NotificationActionGroup.kt). Empty string = snooze off, so no buttons.
+ */
+function syncNotificationActionGroup(actionTypeId: string | null): void {
+  window.AndroidNative?.setNotificationActionGroup(actionTypeId ?? '');
 }
 
 /** Ids of notifications currently visible in the drawer. */

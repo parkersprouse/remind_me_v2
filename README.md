@@ -27,6 +27,9 @@ only** — there is no desktop or browser build.
   Reminders survive device reboot.
 - Reminders can repeat (daily/weekly/custom interval, chained from the prior fire time),
   not just fire once.
+- Reminders can be created from outside the app: a `remindme://create` deep link, the
+  Android share sheet, a long-press launcher shortcut, or a broadcast that creates one
+  with no UI at all (see [Automation](#automation)).
 - Theming is generated at runtime: pick one accent seed color and the full Material 3
   palette (light/dark) is derived from it and applied as CSS custom properties. There's no
   static authored color scheme to edit.
@@ -34,6 +37,78 @@ only** — there is no desktop or browser build.
   (e.g. when moving to a new device), via the Android system file picker.
 - The reminders database (`reminders.db`) and settings (`settings.json`) live in the
   app's private Android data directory.
+
+## Automation
+
+Other apps — Tasker, HTTP Shortcuts, an `adb` one-liner — can create reminders without
+Remind Me! coming to the foreground.
+
+### Broadcast (no UI)
+
+Arms the OS alarm directly; the app is not launched and nothing is shown until the
+reminder fires.
+
+```sh
+adb shell "am broadcast \
+  -n software.greysky.remindme/.CreateReminderReceiver \
+  -a software.greysky.remindme.CREATE_REMINDER \
+  --es details 'Take out the bins' \
+  --el fireAt 1786000000000"
+```
+
+| Extra | Type | Meaning |
+|---|---|---|
+| `details` | string | Reminder text. Required, trimmed, truncated to 240 characters. |
+| `fireAt` | long | Absolute fire time, epoch milliseconds. |
+| `inMinutes` | long | Minutes from now. Used only when `fireAt` is absent. |
+
+Exactly one of `fireAt` / `inMinutes` is required. Numbers are accepted as `--el`, `--ei`
+or `--es`. A `fireAt` up to a minute in the past means "fire now"; anything earlier, or
+more than ten years out, is rejected.
+
+The result code says what happened — `am broadcast` prints it, and an ordered broadcast
+from an app can read it:
+
+| Code | Meaning |
+|---|---|
+| `1` | Scheduled. |
+| `2` | Scheduled, but notifications are disabled for the app. The alarm is armed and a still-future reminder shows up in the list, but it will fire invisibly — and a reminder that fires while notifications are off is dropped from the list the next time the app is opened. |
+| `10` | `details` missing or blank. |
+| `11` | Fire time missing, unparseable, or out of range. |
+| `12` | A repeat-like extra was sent (see below). |
+| `0` | The receiver never ran — wrong component or action, or the app is in Android's *stopped* state (force-stopped, or freshly installed and never opened). |
+
+Two limits worth knowing before you build against this:
+
+- **One-shots only.** Recurrence rules live in the app's TypeScript, not in the receiver,
+  so a request carrying `repeat`, `every`, `interval` or `frequency` is rejected outright
+  rather than quietly downgraded to a single reminder. Use the deep
+  link below and set the rule in the app.
+- **Not idempotent.** A broadcast is never redelivered by the system, so there is no
+  replay to guard against and no de-duplication is attempted. A caller that retries on
+  ambiguity will create two reminders.
+
+Since Android 8 a manifest-declared receiver gets no implicit broadcasts, so the caller
+must set the component (`-n`, above) or at least the package — a bare `-a` action reaches
+nothing.
+
+### Deep link (opens the app)
+
+```
+remindme://create?details=Take%20out%20the%20bins&at=2026-08-14T07:30:00Z
+```
+
+`at` is ISO-8601. With both fields present, a future time, and notifications already
+granted, the reminder is created immediately and the app shows a confirmation; anything
+short of that prefills the New Reminder form instead. With no `details` at all it just
+opens the form — that is what the launcher shortcut fires. Repeats are set in the app.
+
+Sharing plain text to Remind Me! from any app's share sheet always prefills the form,
+since shared text is rarely a well-formed reminder.
+
+Deep links are de-duplicated across an intent replay (relaunching from Recents, or an
+in-process activity recreation); add a `key` query parameter to make a retried request
+distinguishable from a deliberate duplicate.
 
 ## Development
 

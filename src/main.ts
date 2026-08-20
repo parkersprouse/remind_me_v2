@@ -28,8 +28,8 @@ void (async () => {
   // Needs settings (for scheduling) and notifications (for the channel)
   // ready before a fully-specified deep link is allowed to auto-create.
   registerCreateRequestBridge();
-  // Before cleanExpired: a background snooze that already fired while the app
+  // Before cleanExpired: a journalled reminder that already fired while the app
   // was closed needs its row present for the sweep to reason about it.
-  await notification_manager.drainSnoozeJournal();
+  await notification_manager.drainPendingOps();
   await notification_manager.cleanExpired();
 })();

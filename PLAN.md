@@ -18,7 +18,7 @@ is consistent with existing practice — but it is more surface that
 |---|---|---|---|---|
 | 1 | Deep link + share target (foreground creation) | small | — | **Done** |
 | 2 | App shortcuts | hours | 1 | **Done** |
-| 3 | Headless creation broadcast | medium | 1 | not started |
+| 3 | Headless creation broadcast | medium | 1 | **Done** |
 | 4 | Quick-create widget | small | 3 | not started |
 | 5 | Reminder list widget | medium | — | not started |
 
@@ -328,6 +328,112 @@ apply.
 ### Estimate
 
 **Medium — a couple of days**, verification included.
+
+### Result — done
+
+Shipped as `CreateReminderReceiver.kt`, addressed exactly as the sketch above
+predicted (component `-n .../.CreateReminderReceiver`, action
+`software.greysky.remindme.CREATE_REMINDER`, `--es details`, `--el fireAt`).
+Decision A went with option 1, one-shot only: a request carrying a repeat-ish
+extra (`repeat`, `every`, `interval`, `frequency` — only names that can't mean
+anything else, so a generic automation tool's stray `count` variable isn't a
+false positive) is **rejected**, not silently downgraded. Decision B therefore has no trap left to
+document — with no repeat spec ever reaching `schedule()`, an absolute time can
+never be the argument that gets discarded. The caller-facing contract lives in
+[README.md](README.md#automation), as the design called for.
+
+Four things the sketch above did not anticipate:
+
+- **`inMinutes` as well as `fireAt`.** A phase-4 widget button cannot bake an
+  absolute time into a `PendingIntent` that may be tapped hours later, and
+  `updatePeriodMillis` is off the table (30-minute floor). A relative extra is
+  the only shape that works, so it is in from the start rather than bolted on
+  later. `fireAt` wins if both are present. Numeric extras are read
+  type-tolerantly (`--el` / `--ei` / `--es`), because a typed getter silently
+  returns its default for the wrong type — which would read as "absent" and
+  produce a baffling rejection for a caller that used `--ei`.
+- **Nothing fails silently.** Every reject path logs and, when the broadcast is
+  ordered (which is what `am broadcast` sends), reports a distinct result code —
+  scheduled, scheduled-but-notifications-off, bad details, bad time, unsupported
+  repeat. This is also the fastest test loop the feature has.
+- **The action group had to be mirrored natively.** A snooze rebuilds its
+  notification from the serialized source and inherits the snooze buttons for
+  free; a headless create has no source. Channel, title and icon are constants
+  and are duplicated in Kotlin with a mirror comment, but *whether snooze
+  buttons exist at all* depends on the user's setting, which Kotlin cannot read
+  (`NotificationStorage`'s constructor takes an `ObjectMapper`, so the module
+  seam blocks it — the same wall the `Jackson-free` entry points exist for). So
+  `registerSnoozeActions()` now writes the resolved action-type id through the
+  `AndroidNative` bridge into `NotificationActionGroup.kt`, and absent/empty
+  means "arm without buttons" rather than "drop the request" — a benign,
+  *visible* degradation instead of a silent loss.
+- **That mirror needed a watcher, not just a call in `arm()`.** `arm()`
+  re-registers immediately before every notify, so in-app notifications are
+  always current; but a broadcast can land at any moment and reads whatever was
+  registered last. Toggling snooze off left the native mirror stale until the
+  next in-app schedule or app restart — reproduced on the emulator — so
+  `init()` now watches the snooze settings and re-registers on change.
+
+The journal generalized as designed (`PendingOpsJournal.kt`, shared by both
+receivers; `drainSnoozeJournal()` → `drainPendingOps()`, switching on a `type`
+tag). Two details worth keeping: the SharedPreferences **store name stayed
+`SNOOZE_JOURNAL`** even though every Kotlin/TS name around it generalized, since
+prefs survive an app update and renaming the file would orphan an entry the
+shipped build wrote; and an entry with **no `type` is read as a snooze**, for
+exactly the same reason. Both were verified by injecting a pre-phase-3 entry.
+
+### Verification — what was actually run
+
+Emulator, on debug **and** on the signed minified release APK.
+
+- Process killed (`am kill`, not force-stop — see the stopped-state note below):
+  broadcast → alarm armed → fires on `reminders_high` with its snooze buttons,
+  app never launched. Then a preset snooze tapped from the shade with the
+  process still dead → journal holds a typed `create` followed by a typed
+  `snooze` naming it as source → next open collapses the pair into exactly one
+  row, the snoozed copy. That compound case is the one that exercises the
+  mirrored action group and both receivers together.
+- App foregrounded: the `PENDING_OPS_UPDATED` nudge lands the row within a
+  couple of seconds, no navigation needed.
+- Validation: blank/missing details, missing time, past time, absurd future,
+  `Long.MAX_VALUE` `inMinutes` (which would otherwise overflow into a *past*
+  time and sail through the range check), repeat extras, 300 → 240 character
+  truncation, `--es`-shaped numbers, and a within-grace past time clamping to
+  "now". All eleven return their expected result code on both builds.
+- Snooze disabled: the mirror clears, and a headless notification arrives with
+  no action buttons at all; re-enabling repopulates it live via the watcher.
+- Notification permission revoked: both requests still return `2` and still arm
+  (AlarmManager doesn't care about `POST_NOTIFICATIONS`), and the reminder fires
+  invisibly. A *future* one is in the list on next open; one that already fired
+  is swept — a consequence of the `activeNotificationIds()` bug below, and the
+  reason the README's result-code table qualifies "still in the list" rather
+  than promising it flatly.
+- `adb reboot` with the app never reopened: the alarm re-armed at its exact
+  original time and fired ~3s late, buttons intact. This is what
+  `scheduleNotificationInBackground`'s `appendNotifications()` half is for.
+- Legacy compat: a hand-injected untyped journal entry drained as a snooze.
+
+**A force-stopped app is unreachable.** Android's stopped-state rule means a
+manifest receiver gets no broadcast until the app is launched again, so the
+result code is `0` (receiver never ran) — the same caveat the `BOOT_COMPLETED`
+restore path already carries. Documented in the README's result-code table.
+
+### A pre-existing bug this turned up
+
+`activeNotificationIds()` in `src/lib/notifications.ts` has never worked on
+Android, so "a fired one-shot still sitting in the drawer survives the
+`cleanExpired()` sweep" has never actually happened. The plugin's JS `active()`
+wrapper returns the raw Android payload
+(`{"values":[{"nameValuePairs":{"id":…}}]}`) rather than an
+`ActiveNotification[]`; `.map()` on that object throws, the `catch` swallows it,
+and the function returns the empty set that means "sweep everything". So on
+every launch the row is deleted *and* `cancelPending()` dismisses the still-
+visible notification, taking its snooze buttons with it.
+
+Unrelated to this phase (it predates it and affects in-app reminders
+identically), so it was left alone rather than folded into the same change — but
+it is worth fixing, and it matters to phase 5: staleness case 1 there assumes
+fired one-shots linger in the list, which today they do not.
 
 ---
 

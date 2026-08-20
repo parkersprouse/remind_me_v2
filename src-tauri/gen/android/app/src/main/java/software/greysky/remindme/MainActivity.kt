@@ -87,19 +87,21 @@ class MainActivity : TauriActivity() {
   private var pendingExportJson: String? = null
 
   /**
-   * Nudges the frontend to drain the snooze journal the moment a background
-   * snooze lands (SnoozeActionReceiver).
+   * Nudges the frontend to drain the pending-ops journal the moment a receiver
+   * writes to it — a background snooze (SnoozeActionReceiver) or a headless
+   * create (CreateReminderReceiver).
    *
-   * The frontend also drains at startup and from androidResume, which covers a
-   * snooze taken while the app was dead or backgrounded. Neither covers the
-   * remaining case: the app is in the foreground and the user snoozes a
-   * heads-up notification. The notification shade is an overlay, so the
-   * Activity never pauses and no resume ever arrives — without this the
-   * reminder list would sit stale until the user navigated away and back.
+   * The frontend also drains at startup and from androidResume, which covers an
+   * entry written while the app was dead or backgrounded. Neither covers the
+   * remaining case: the app is in the foreground when it lands. Snoozing from
+   * the shade never pauses the Activity (the shade is an overlay) and a
+   * broadcast from another app doesn't either, so no resume ever arrives —
+   * without this the reminder list would sit stale until the user navigated
+   * away and back.
    */
-  private val snoozeJournalReceiver = object : BroadcastReceiver() {
+  private val pendingOpsReceiver = object : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-      webView?.evaluateJavascript("window.androidSnoozeJournal && window.androidSnoozeJournal()", null)
+      webView?.evaluateJavascript("window.androidPendingOps && window.androidPendingOps()", null)
     }
   }
 
@@ -138,8 +140,8 @@ class MainActivity : TauriActivity() {
     //    instance state that recorded it as already handled.
     ContextCompat.registerReceiver(
       this,
-      snoozeJournalReceiver,
-      IntentFilter(SNOOZE_JOURNAL_UPDATED),
+      pendingOpsReceiver,
+      IntentFilter(PENDING_OPS_UPDATED),
       ContextCompat.RECEIVER_NOT_EXPORTED,
     )
 
@@ -183,7 +185,7 @@ class MainActivity : TauriActivity() {
   }
 
   override fun onDestroy() {
-    unregisterReceiver(snoozeJournalReceiver)
+    unregisterReceiver(pendingOpsReceiver)
     super.onDestroy()
   }
 
@@ -256,13 +258,24 @@ class MainActivity : TauriActivity() {
     }
 
     /**
-     * Hands over (and clears) the snoozes performed by SnoozeActionReceiver
+     * Hands over (and clears) the reminder bookkeeping the receivers performed
      * while no webview was around to update reminders.db. Returns a JSON array
      * string; unlike the backup methods this is synchronous, since
      * @JavascriptInterface return values cross straight back into JS.
      */
     @JavascriptInterface
-    fun takeSnoozeJournal(): String = SnoozeJournal.takeAll(this@MainActivity)
+    fun takePendingOps(): String = PendingOpsJournal.takeAll(this@MainActivity)
+
+    /**
+     * Mirrors the snooze action group the frontend just registered, so
+     * CreateReminderReceiver can attach the same buttons to a reminder armed
+     * headlessly. Empty string = snooze disabled, so no buttons (see
+     * NotificationActionGroup).
+     */
+    @JavascriptInterface
+    fun setNotificationActionGroup(actionTypeId: String) {
+      NotificationActionGroup.set(this@MainActivity, actionTypeId)
+    }
 
     @JavascriptInterface
     fun openNotificationSettings() {

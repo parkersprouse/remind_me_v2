@@ -82,6 +82,26 @@
             </intent-filter>
         </receiver>
 
+        <!-- Headless reminder creation, phase 3 (PLAN.md): a broadcast arms a
+             reminder with no UI and without launching the app — the entry
+             point for automation apps (Tasker, HTTP Shortcuts) and, from
+             phase 4, the home-screen widget's preset buttons. See
+             CreateReminderReceiver.kt and the contract in README.md.
+
+             Deliberately exported: a signature or custom permission would be
+             unholdable by exactly the third-party automation apps this exists
+             for, so the mitigation is input validation, not access control —
+             the extras only ever become notification body text. Note a
+             manifest-declared receiver gets no implicit broadcasts since API
+             26, so callers must address it by component or package. -->
+        <receiver
+            android:name=".CreateReminderReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="software.greysky.remindme.CREATE_REMINDER" />
+            </intent-filter>
+        </receiver>
+
         <provider
           android:name="androidx.core.content.FileProvider"
           android:authorities="${applicationId}.fileprovider"
