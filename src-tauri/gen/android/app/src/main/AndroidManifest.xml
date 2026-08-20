@@ -36,12 +36,22 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
 
+            <!-- Long-press-launcher shortcuts, phase 2 (PLAN.md). Must hang
+                 off the MAIN/LAUNCHER activity — that's where the launcher
+                 looks for them. See res/xml/shortcuts.xml. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+
             <!-- External reminder creation, phase 1 (PLAN.md): a
                  remindme://create deep link, from another app, a URL, or a
                  launcher shortcut (phase 2). BROWSABLE lets a plain <a>
                  link/browser address bar trigger it too. Handled in
                  MainActivity.kt via the same replay-guarded, retry-until-ready
-                 delivery as a notification action tap. -->
+                 delivery as a notification action tap — except with no
+                 details, which is a navigate-only request (open the New
+                 Reminder form) and therefore exempt from that guard, since
+                 there is nothing for it to duplicate. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

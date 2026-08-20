@@ -67,12 +67,25 @@ export function registerCreateRequestBridge(): void {
  */
 async function handleCreateRequest(request: RawCreateRequest): Promise<void> {
   const details = normalizeDetails(request.details);
-  if (details === null) return;
-
   const at = request.atMillis;
   const has_future_time = at !== null && at > Date.now();
   const router = useRouterStore();
   const granted = await permissions.status();
+
+  // A deep link with no details isn't a create request at all — it's the
+  // launcher shortcut's bare `remindme://create` (PLAN.md, phase 2) asking
+  // for the New Reminder form. Just navigate: deliberately no prefill and no
+  // reset, so a half-typed reminder survives the trip (the launcher icon
+  // doesn't clear the form either). Details-less shares are meaningless, so
+  // they're dropped. MainActivity.kt's isCreate mirrors this split — keep the
+  // two in sync.
+  if (details === null) {
+    if (request.source === 'deeplink' && granted) {
+      router.goTo(Pages.Home);
+      router.setTab(HomeTabs.NewReminder);
+    }
+    return;
+  }
 
   if (request.source === 'deeplink' && has_future_time && granted) {
     try {

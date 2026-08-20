@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static launcher shortcuts (PLAN.md, phase 2), reached by long-pressing
+     the app icon. Registered from AndroidManifest.xml's MAIN/LAUNCHER
+     activity via the android.app.shortcuts meta-data.
+
+     The intent is the phase-1 deep link with no query parameters, which the
+     frontend treats as "open the New Reminder form" rather than a create
+     request (src/lib/createRequest.ts). targetPackage/targetClass are spelled
+     out because a resource XML sees no manifest placeholders — they must
+     match applicationId in build.gradle.kts.
+
+     Preset-duration shortcuts ("Remind me in 1h") deliberately aren't here:
+     a static intent can't compute a time relative to when it's tapped, so
+     they need phase 3's headless creation broadcast. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+  <shortcut
+      android:shortcutId="new-reminder"
+      android:enabled="true"
+      android:icon="@drawable/ic_shortcut_new_reminder"
+      android:shortcutShortLabel="@string/shortcut_new_reminder_short"
+      android:shortcutLongLabel="@string/shortcut_new_reminder_long">
+    <intent
+        android:action="android.intent.action.VIEW"
+        android:targetPackage="software.greysky.remindme"
+        android:targetClass="software.greysky.remindme.MainActivity"
+        android:data="remindme://create" />
+  </shortcut>
+</shortcuts>

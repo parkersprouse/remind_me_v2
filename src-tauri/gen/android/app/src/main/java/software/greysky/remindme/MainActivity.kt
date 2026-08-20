@@ -34,7 +34,21 @@ private data class CreateRequest(
   val atMillis: Long?,
   val source: String,
   val replayKey: String,
-)
+) {
+  /**
+   * Whether this request would actually create a reminder. A bare
+   * `remindme://create` with no details — what the launcher shortcut sends
+   * (PLAN.md, phase 2) — only asks the frontend to open the New Reminder
+   * form, so it stays out of the replay guard: dedup is meaningless for a
+   * request that creates nothing, and its replayKey is a constant, which
+   * has no business occupying the single handled-fingerprint slot a real
+   * create needs. Blank-handling matches normalizeDetails() in
+   * src/lib/createRequest.ts so both sides agree on where "create" ends and
+   * "navigate" begins.
+   */
+  val isCreate: Boolean
+    get() = !details.isNullOrBlank()
+}
 
 // Arbitrary but distinctive request codes for the backup document pickers;
 // results for codes we don't own fall through to super (Tauri plugins).
@@ -129,15 +143,27 @@ class MainActivity : TauriActivity() {
       ContextCompat.RECEIVER_NOT_EXPORTED,
     )
 
+    // Restore before comparing, and keep the restored value: without this the
+    // guard survives exactly one recreation. The suppressed pass records
+    // nothing (capture is skipped), so the *next* onSaveInstanceState writes
+    // null, and the recreation after that sees no match and replays the
+    // intent — a second duplicate reminder, one config change later.
+    handledActionFingerprint = savedInstanceState?.getString(HANDLED_ACTION_KEY)
+
     val fromHistory = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
     val currentFingerprint = fingerprint(intent)
-    val alreadyHandled =
-      currentFingerprint != null && savedInstanceState?.getString(HANDLED_ACTION_KEY) == currentFingerprint
+    val alreadyHandled = currentFingerprint != null && handledActionFingerprint == currentFingerprint
     if (!fromHistory && !alreadyHandled) captureIncomingIntent(intent)
   }
 
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
+    // Neither Activity nor TauriActivity/WryActivity calls setIntent, so
+    // without this getIntent() would still return the *launch* intent after a
+    // recreation. The replay guard reads getIntent(), so a second deep-link
+    // create arriving here would leave the first one looking unhandled and
+    // replay it — the same duplicate this guard exists to prevent.
+    setIntent(intent)
     captureIncomingIntent(intent)
   }
 
@@ -359,7 +385,7 @@ class MainActivity : TauriActivity() {
 
   private fun fingerprint(intent: Intent?): String? =
     extractAction(intent)?.let { (id, actionId) -> "$id|$actionId" }
-      ?: extractCreateRequest(intent)?.replayKey
+      ?: extractCreateRequest(intent)?.takeIf { it.isCreate }?.replayKey
 
   /**
    * Single entry point for both onCreate and onNewIntent: an incoming intent
@@ -406,7 +432,9 @@ class MainActivity : TauriActivity() {
 
   private fun captureCreateRequest(intent: Intent?) {
     val request = extractCreateRequest(intent) ?: return
-    handledActionFingerprint = request.replayKey
+    // Only creating requests are recorded as handled — the same isCreate test
+    // fingerprint() uses, so the two can't drift apart.
+    if (request.isCreate) handledActionFingerprint = request.replayKey
     pendingCreateRequest = request
     deliverCreateRequest(0)
   }

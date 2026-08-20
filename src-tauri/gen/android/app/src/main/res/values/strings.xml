@@ -1,4 +1,13 @@
 <resources>
     <string name="app_name">"Remind Me"</string>
     <string name="main_activity_title">"Remind Me"</string>
+
+    <!-- Launcher shortcut (res/xml/shortcuts.xml). Android suggests keeping
+         the short label to ~10 characters, but it is what the launcher
+         actually renders in the long-press sheet (it only promotes the long
+         label when that one fits the popup width, which "Create new
+         reminder" does not), so a bare "New" there would be uselessly vague.
+         Mirrors the platform Clock app's "New timer" / "Create new timer". -->
+    <string name="shortcut_new_reminder_short">"New reminder"</string>
+    <string name="shortcut_new_reminder_long">"Create new reminder"</string>
 </resources>

@@ -17,7 +17,7 @@ is consistent with existing practice — but it is more surface that
 | # | Phase | Size | Depends on | Status |
 |---|---|---|---|---|
 | 1 | Deep link + share target (foreground creation) | small | — | **Done** |
-| 2 | App shortcuts | hours | 1 | not started |
+| 2 | App shortcuts | hours | 1 | **Done** |
 | 3 | Headless creation broadcast | medium | 1 | not started |
 | 4 | Quick-create widget | small | 3 | not started |
 | 5 | Reminder list widget | medium | — | not started |
@@ -137,6 +137,83 @@ the phase-1 deep links. No Kotlin. This is the cheapest quick-create surface the
 app can have, and it falls straight out of phase 1.
 
 **Estimate: hours.**
+
+### Result — done
+
+Shipped as one static shortcut, "New reminder", firing the phase-1 deep link
+with no query parameters. Preset durations stayed out, as anticipated above:
+a static intent is fixed at build time and cannot express "now + 1h", so they
+genuinely wait on phase 3.
+
+Two things the sketch above did not anticipate:
+
+- **A bare `remindme://create` had no meaning yet.** Phase 1 dropped any
+  request whose details were empty, so the shortcut would have launched the
+  app and done nothing. It now reads as a *navigate* request — route to
+  Home / New Reminder — deliberately without prefilling or resetting the
+  form, so a half-typed reminder survives the trip (the launcher icon doesn't
+  clear it either, and `ReminderForm.prefill()` would have). Details-less
+  shares are still dropped; only a deep link can mean "open the form".
+- **So it did need Kotlin after all** — the replay guard shouldn't record a
+  fingerprint for a request that creates nothing; dedup is meaningless there.
+  `CreateRequest.isCreate` (mirroring `normalizeDetails()`'s blank test, so
+  the two sides can't drift) now gates both `fingerprint()` and the
+  `handledActionFingerprint` write. `FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY`
+  still covers the Recents case, which is the one worth suppressing. Note
+  this is a correctness/consistency fix, not a visible-bug fix: a suppressed
+  navigate would be invisible anyway, because the webview reboots on
+  recreation and Pinia lands on `NewReminder` by default regardless.
+
+### The phase-1 bug this verification turned up
+
+Chasing the above surfaced a genuine duplicate-reminder bug that had been
+shipping since phase 1. Two independent defects, both in the replay guard:
+
+1. **The guard survived exactly one recreation.** `onCreate` compared
+   `savedInstanceState` against the current fingerprint but never *restored*
+   it into `handledActionFingerprint`. The suppressed pass then records
+   nothing, so the next `onSaveInstanceState` writes null, and the recreation
+   after that sees no match and replays the create. Reproduced on the signed
+   release APK: create via deep link → change the system font scale twice
+   (`fontScale` is absent from the activity's `configChanges`, so each change
+   recreates it in-process) → **two identical reminders**.
+2. **`getIntent()` went stale.** Neither `Activity` nor Tauri's
+   `TauriActivity`/`WryActivity` calls `setIntent()` in `onNewIntent`, so
+   after a recreation the guard was reading the *launch* intent, not the last
+   one delivered. A second deep-link create in the same session therefore left
+   the first looking unhandled, and a later recreation replayed it.
+
+Fixes are one line each: restore the fingerprint in `onCreate`, and
+`setIntent(intent)` in `onNewIntent`. Verified on the signed release build —
+six consecutive recreations after a create hold at one row, and the
+two-creates-then-recreation sequence holds at two.
+
+### Verification
+
+Emulator-verified on debug **and** on the signed, minified release APK:
+`dumpsys shortcut` shows the shortcut parsed with both labels and its icon
+resource (confirming `android:data` is honoured on `<intent>` — it works, but
+it is absent from the documented attribute set, so it was checked rather than
+assumed); a real long-press-and-tap from the launcher opens the New Reminder
+tab; firing the intent while the app sits on Scheduled Reminders switches
+tabs and leaves typed details intact; a cold start after genuine process
+death works, and works identically on the second consecutive tap; on a fresh
+install with notifications ungranted it lands on the landing gate and
+advances to New Reminder once granted; and across all of it the bare deep
+link inserted zero rows into `reminders.db` while a fully-specified one still
+auto-created exactly one.
+
+Note `run-as` is unavailable on the release APK (not debuggable), so the
+release-build DB assertions went through the sql plugin over WebView CDP:
+`window.__TAURI__.core.invoke('plugin:sql|select', { db: 'sqlite:reminders.db',
+query: '…', values: [] })`.
+
+One UI detail worth keeping: the launcher renders `shortcutShortLabel`
+unless the long label happens to fit its popup, so the short label carries
+the meaning ("New reminder"), not a terse "New". The icon is its own
+drawable — a filled disc in `@color/ic_launcher_background` with a white
+glyph — because `ic_stat_logo` is alpha-only white and would vanish against
+a light launcher.
 
 ---
 
