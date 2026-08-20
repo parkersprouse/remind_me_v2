@@ -30,6 +30,12 @@ export interface AndroidNativeBridge {
    * means snooze is disabled.
    */
   setNotificationActionGroup: (actionTypeId: string) => void;
+  /**
+   * Hands the reminder-list widget its denormalized JSON snapshot — already
+   * formatted rows plus both color schemes — and repaints any placed
+   * instances. See src/lib/widget.ts and WidgetSnapshot.kt.
+   */
+  setWidgetSnapshot: (json: string) => void;
 }
 
 declare global {

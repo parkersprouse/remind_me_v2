@@ -39,4 +39,18 @@
          editable field), so every preset reminder carries this one body; the
          fire time is what distinguishes them in the list. -->
     <string name="widget_reminder_details">"Reminder"</string>
+
+    <!-- Reminder-list home-screen widget (PLAN.md, phase 5). Its rows are
+         rendered from the snapshot the frontend pushes (WidgetSnapshot.kt),
+         so unlike the quick-create widget above nothing here duplicates app
+         data — these are only the chrome. -->
+    <string name="list_widget_label">"Reminders"</string>
+    <string name="list_widget_description">"Your upcoming reminders, on the home screen."</string>
+    <string name="list_widget_title">"Reminders"</string>
+    <string name="list_widget_empty">"No reminders scheduled"</string>
+    <!-- Distinct from the line above on purpose: a widget can be placed on an
+         install whose app has never been opened (binding a widget doesn't
+         launch it), and there is no snapshot then. Claiming "no reminders"
+         would be asserting something about data nothing has ever read. -->
+    <string name="list_widget_never_opened">"Open Remind Me to see your reminders"</string>
 </resources>

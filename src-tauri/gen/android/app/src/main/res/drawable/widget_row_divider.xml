@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Row separator in the reminder-list widget, mirroring the border-bottom on
+     ReminderListEntry.vue. Same trick as widget_panel: a white rectangle
+     recolored at runtime with the snapshot's divider color, which is pushed
+     opaque precisely because a color filter cannot apply alpha (SRC_ATOP
+     composites onto the source, so a translucent filter would wash the shape
+     out rather than fade it). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+  <solid android:color="#FFFFFFFF" />
+</shape>

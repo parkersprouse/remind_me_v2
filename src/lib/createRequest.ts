@@ -24,6 +24,13 @@ interface RawCreateRequest {
   details: string | null;
   atMillis: number | null;
   source: 'deeplink' | 'share';
+  /**
+   * Which surface the request is asking for: the New Reminder form
+   * (`remindme://create`, a share, the launcher shortcut) or the reminder
+   * list (`remindme://reminders`, the phase-5 widget's rows). 'list' is
+   * navigation only and never creates anything.
+   */
+  target: 'new' | 'list';
 }
 
 /** A create request that couldn't be auto-created and needs the user's input. */
@@ -71,6 +78,20 @@ async function handleCreateRequest(request: RawCreateRequest): Promise<void> {
   const has_future_time = at !== null && at > Date.now();
   const router = useRouterStore();
   const granted = await permissions.status();
+
+  // `remindme://reminders` only asks for the list (PLAN.md, phase 5). It is
+  // deliberately read as pure navigation on both sides — MainActivity.kt does
+  // not even parse this host's query string — because the deep-link filter is
+  // BROWSABLE, so any web page can send one; letting details/at ride along
+  // would turn a host documented as navigate-only into a second create
+  // surface, outside the replay guard that create requests are covered by.
+  if (request.target === 'list') {
+    if (granted) {
+      router.goTo(Pages.Home);
+      router.setTab(HomeTabs.ScheduledReminders);
+    }
+    return;
+  }
 
   // A deep link with no details isn't a create request at all — it's the
   // launcher shortcut's bare `remindme://create` (PLAN.md, phase 2) asking

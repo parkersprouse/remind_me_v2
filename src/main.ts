@@ -9,6 +9,7 @@ import App from '@/App.vue';
 import { registerAndroidBackHandler } from '~lib/androidBack.ts';
 import { registerCreateRequestBridge } from '~lib/createRequest.ts';
 import { notification_manager } from '~lib/notifications.ts';
+import { initWidgetSnapshot } from '~lib/widget.ts';
 import { useSettingsStore } from '~stores/settings.ts';
 
 import './assets/styles/base.css';
@@ -32,4 +33,7 @@ void (async () => {
   // was closed needs its row present for the sweep to reason about it.
   await notification_manager.drainPendingOps();
   await notification_manager.cleanExpired();
+  // Last: the first snapshot should describe the reminder list as it stands
+  // after the drain and the sweep, not the rows they were about to change.
+  initWidgetSnapshot();
 })();

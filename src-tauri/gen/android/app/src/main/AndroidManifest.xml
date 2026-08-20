@@ -57,6 +57,13 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="remindme" android:host="create" />
+                <!-- Navigate-only, phase 5 (PLAN.md): what the reminder-list
+                     widget's rows fire. Deliberately parsed without touching
+                     its query string (MainActivity.kt) — this filter is
+                     BROWSABLE, so any web page can send one, and a host
+                     documented as "just open the list" must not become a
+                     second create surface outside the replay guard. -->
+                <data android:scheme="remindme" android:host="reminders" />
             </intent-filter>
 
             <!-- Share-sheet target: "share text -> Remind Me!" from any app.
@@ -126,6 +133,33 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/quick_create_widget_info" />
         </receiver>
+
+        <!-- Reminder-list home-screen widget, phase 5 (PLAN.md): renders the
+             denormalized snapshot the frontend pushes through the
+             AndroidNative bridge (WidgetSnapshot.kt), so Kotlin never reads
+             reminders.db and the app's formatting logic stays in one
+             language. Exported for the same reason as the quick-create
+             provider above — the launcher is a different process. -->
+        <receiver
+            android:name=".ReminderListWidgetProvider"
+            android:label="@string/list_widget_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/reminder_list_widget_info" />
+        </receiver>
+
+        <!-- Backs that widget's ListView. RemoteViews.RemoteCollectionItems
+             would make this file unnecessary, but it is API 31+ and minSdk is
+             26. BIND_REMOTEVIEWS restricts binding to the system's
+             AppWidgetService, which is the only thing that should reach it. -->
+        <service
+            android:name=".ReminderListWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
 
         <provider
           android:name="androidx.core.content.FileProvider"

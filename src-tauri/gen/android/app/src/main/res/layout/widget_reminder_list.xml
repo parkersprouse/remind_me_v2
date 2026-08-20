@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reminder-list widget (PLAN.md, phase 5). Plain RemoteViews for the reason
+     spelled out in ReminderListWidgetProvider: Glance would buy authoring
+     ergonomics for a list of text rows at the price of reopening this repo's
+     R8 scar tissue.
+
+     The root is a FrameLayout so the panel can be an ImageView underneath the
+     content: that is what lets the surface colour follow the user's accent
+     (see widget_panel.xml).
+
+     This layout doubles as the widget picker's previewLayout, exactly as
+     phase 4's does. A ListView renders nothing when inflated statically, so
+     what the picker shows is the header plus the empty line below — an honest
+     preview of an empty widget rather than a second layout full of invented
+     reminders. (previewLayout is API 31+ regardless; below it the picker
+     falls back to the app icon.) -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+  <ImageView
+      android:id="@+id/widget_panel"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:src="@drawable/widget_panel"
+      android:scaleType="fitXY"
+      android:importantForAccessibility="no"
+      android:contentDescription="@null" />
+
+  <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:orientation="vertical"
+      android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+      <TextView
+          android:id="@+id/widget_title"
+          android:layout_width="0dp"
+          android:layout_height="wrap_content"
+          android:layout_weight="1"
+          android:paddingStart="6dp"
+          android:paddingEnd="6dp"
+          android:text="@string/list_widget_title"
+          android:textSize="16sp"
+          android:maxLines="1"
+          android:ellipsize="end" />
+
+      <ImageView
+          android:id="@+id/widget_new_reminder"
+          android:layout_width="40dp"
+          android:layout_height="40dp"
+          android:src="@drawable/ic_widget_plus"
+          android:scaleType="centerInside"
+          android:contentDescription="@string/shortcut_new_reminder_long" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="4dp">
+
+      <ListView
+          android:id="@+id/widget_list"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+          android:divider="@null"
+          android:dividerHeight="0dp" />
+
+      <!-- Shown by setEmptyView. Its text is set at runtime: "no reminders"
+           and "the app has never told us about any" are different claims. -->
+      <TextView
+          android:id="@+id/widget_empty"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+          android:gravity="center"
+          android:padding="12dp"
+          android:text="@string/list_widget_empty"
+          android:textSize="14sp" />
+    </FrameLayout>
+  </LinearLayout>
+</FrameLayout>

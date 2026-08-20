@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One reminder in the list widget (PLAN.md, phase 5). Mirrors
+     ReminderListEntry.vue: details on top, then a meta line that is either a
+     timestamp or the repeat rule, then a divider.
+
+     The Vue original prefixes both lines with a Font Awesome glyph; those are
+     dropped here rather than hand-authored as vector drawables, because the
+     two lines already read unambiguously (a repeat rule never looks like a
+     date) and every icon added would be a drawable maintained in a second
+     place.
+
+     Colours are applied per row by ReminderListWidgetService — a
+     RemoteViewsFactory has to paint each row itself, since the provider's
+     RemoteViews cannot reach into a collection's children. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+  <TextView
+      android:id="@+id/widget_row_details"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:paddingStart="6dp"
+      android:paddingEnd="6dp"
+      android:paddingTop="12dp"
+      android:textSize="15sp"
+      android:maxLines="1"
+      android:ellipsize="end" />
+
+  <TextView
+      android:id="@+id/widget_row_meta"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:paddingStart="6dp"
+      android:paddingEnd="6dp"
+      android:paddingTop="4dp"
+      android:paddingBottom="12dp"
+      android:textSize="13sp"
+      android:maxLines="1"
+      android:ellipsize="end" />
+
+  <ImageView
+      android:id="@+id/widget_row_divider"
+      android:layout_width="match_parent"
+      android:layout_height="1dp"
+      android:src="@drawable/widget_row_divider"
+      android:scaleType="fitXY"
+      android:importantForAccessibility="no"
+      android:contentDescription="@null" />
+</LinearLayout>

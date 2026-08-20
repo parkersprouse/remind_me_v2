@@ -23,17 +23,25 @@ import org.json.JSONObject
 private const val HANDLED_ACTION_KEY = "handledNotificationAction"
 
 /**
- * A `remindme://create` deep link or ACTION_SEND share-text hand-off, parsed
- * from the launching intent (PLAN.md, phase 1). `replayKey` is what makes the
- * request idempotent across a replayed intent (see fingerprint()) — the full
- * URI for a deep link (a caller-supplied `key` query param just rides along
- * as part of it), or the shared text itself for a share.
+ * A `remindme://` deep link or ACTION_SEND share-text hand-off, parsed from
+ * the launching intent (PLAN.md, phase 1; the `reminders` host is phase 5).
+ * `replayKey` is what makes the request idempotent across a replayed intent
+ * (see fingerprint()) — the full URI for a deep link (a caller-supplied `key`
+ * query param just rides along as part of it), or the shared text itself for
+ * a share.
  */
 private data class CreateRequest(
   val details: String?,
   val atMillis: Long?,
   val source: String,
   val replayKey: String,
+  /**
+   * Which surface the request asks for: "new" (the New Reminder form) or
+   * "list" (the scheduled-reminder list, PLAN.md phase 5). A "list" request
+   * is navigation and nothing else — see extractCreateRequest, which does not
+   * even read that host's query string.
+   */
+  val target: String,
 ) {
   /**
    * Whether this request would actually create a reminder. A bare
@@ -277,6 +285,18 @@ class MainActivity : TauriActivity() {
       NotificationActionGroup.set(this@MainActivity, actionTypeId)
     }
 
+    /**
+     * Hands the reminder-list widget its snapshot — formatted rows plus both
+     * color schemes — and repaints any placed instances (PLAN.md, phase 5;
+     * see WidgetSnapshot and src/lib/widget.ts). Synchronous like
+     * takePendingOps: the write is a SharedPreferences commit and the widget
+     * update a binder call, neither of which needs the UI thread.
+     */
+    @JavascriptInterface
+    fun setWidgetSnapshot(json: String) {
+      WidgetSnapshot.set(this@MainActivity, json)
+    }
+
     @JavascriptInterface
     fun openNotificationSettings() {
       // @JavascriptInterface methods run on a WebView background thread; launch
@@ -380,17 +400,28 @@ class MainActivity : TauriActivity() {
     return when (intent.action) {
       Intent.ACTION_VIEW -> {
         val uri = intent.data ?: return null
-        if (uri.scheme != "remindme" || uri.host != "create") return null
-        val details = uri.getQueryParameter("details")
-        val atMillis = uri.getQueryParameter("at")?.let {
-          runCatching { Instant.parse(it).toEpochMilli() }.getOrNull()
+        if (uri.scheme != "remindme") return null
+        when (uri.host) {
+          "create" -> {
+            val details = uri.getQueryParameter("details")
+            val atMillis = uri.getQueryParameter("at")?.let {
+              runCatching { Instant.parse(it).toEpochMilli() }.getOrNull()
+            }
+            CreateRequest(details, atMillis, "deeplink", uri.toString(), "new")
+          }
+          // Navigate-only (PLAN.md, phase 5): open the reminder list. The
+          // query string is deliberately not read — details and at are nulled
+          // by construction, so isCreate stays false and this host cannot
+          // become a create surface reachable from any web page (the filter
+          // is BROWSABLE). src/lib/createRequest.ts mirrors the same refusal.
+          "reminders" -> CreateRequest(null, null, "deeplink", uri.toString(), "list")
+          else -> null
         }
-        CreateRequest(details, atMillis, "deeplink", uri.toString())
       }
       Intent.ACTION_SEND -> {
         if (intent.type != "text/plain") return null
         val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return null
-        CreateRequest(text, null, "share", "share:$text")
+        CreateRequest(text, null, "share", "share:$text", "new")
       }
       else -> null
     }
@@ -468,6 +499,7 @@ class MainActivity : TauriActivity() {
       put("details", request.details ?: JSONObject.NULL)
       put("atMillis", request.atMillis ?: JSONObject.NULL)
       put("source", request.source)
+      put("target", request.target)
     }
     wv.evaluateJavascript(
       "window.androidCreateRequest ? window.androidCreateRequest($payload) : false"

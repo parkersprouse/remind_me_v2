@@ -146,3 +146,46 @@ export function applyDynamicColor(seedHex: string, mode: 'light' | 'dark'): void
 export function contrastingInk(hex: string): string {
   return Hct.fromInt(argbFromHex(hex)).tone >= 60 ? '#000000' : '#ffffff';
 }
+
+/**
+ * The subset of the palette the home-screen reminder-list widget paints
+ * itself with (PLAN.md, phase 5). A widget is RemoteViews inflated by the
+ * launcher, so it can reach neither the CSS custom properties above nor the
+ * seed they were generated from — the frontend hands it finished colors in
+ * the snapshot instead, which is also what lets the widget render correctly
+ * on a device that has not opened the app since its last reboot.
+ *
+ * Both schemes are always sent, and the widget picks between them, because
+ * the app's own theme setting may be 'system': resolving it here would freeze
+ * whichever mode was current at the last push, and the launcher already knows
+ * the live one.
+ */
+export interface WidgetPalette {
+  /** Widget panel. Applied as an opaque color filter, so it must be opaque. */
+  surface: string;
+  onSurface: string;
+  /**
+   * Meta line, as #AARRGGBB: ReminderListEntry.vue draws it at 0.66 alpha
+   * over the surface, and TextView.setTextColor takes the alpha directly.
+   */
+  meta: string;
+  /** Accent, used for the "+" glyph. */
+  primary: string;
+  /** Row separator — the same token ReminderListEntry.vue's border uses. */
+  divider: string;
+}
+
+/** 0.66 alpha, matching ReminderListEntry.vue's meta line. */
+const META_ALPHA = 'A8';
+
+export function widgetPalette(seedHex: string, mode: 'light' | 'dark'): WidgetPalette {
+  const scheme = schemesFor(seedHex)[mode];
+  const on_surface = hexFromArgb(scheme.onSurface);
+  return {
+    surface: hexFromArgb(scheme.surface),
+    onSurface: on_surface,
+    meta: `#${META_ALPHA}${on_surface.slice(1)}`,
+    primary: hexFromArgb(scheme.primary),
+    divider: hexFromArgb(scheme.outlineVariant),
+  };
+}

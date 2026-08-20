@@ -35,6 +35,13 @@ only** — there is no desktop or browser build.
   every one of them is titled simply "Reminder", since a widget can't take text input —
   plus a "+" button that opens the New Reminder form. Its colours follow the system
   light/dark setting rather than the accent you picked in the app.
+- The **Reminders** home-screen widget lists what's coming up, scrolls, and takes both
+  its contents and its colours from the app, so it follows your accent seed and your
+  light/dark/system setting. Tapping a row opens the reminder list; "+" opens the New
+  Reminder form. It renders from a snapshot the app saves, so it stays correct across
+  reboots and shows real reminders even if the app hasn't been opened in weeks — but
+  anything that changes reminders while the app is closed (a snooze from a notification,
+  a reminder created by broadcast) shows up the next time you open it.
 - Theming is generated at runtime: pick one accent seed color and the full Material 3
   palette (light/dark) is derived from it and applied as CSS custom properties. There's no
   static authored color scheme to edit.
@@ -114,6 +121,13 @@ since shared text is rarely a well-formed reminder.
 Deep links are de-duplicated across an intent replay (relaunching from Recents, or an
 in-process activity recreation); add a `key` query parameter to make a retried request
 distinguishable from a deliberate duplicate.
+
+```
+remindme://reminders
+```
+
+Opens the app on the scheduled-reminder list. It never creates anything, and any query
+parameters are ignored — this is what the Reminders widget's rows fire.
 
 ## Development
 

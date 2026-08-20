@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reminder-list widget metadata (PLAN.md, phase 5), pointed at by the
+     android.appwidget.provider meta-data on ReminderListWidgetProvider.
+
+     updatePeriodMillis is 0 for the same reason as phase 4's, and here it is
+     load-bearing rather than merely tidy: the widget's data changes only when
+     the frontend pushes a new snapshot, and it repaints then, so a periodic
+     wake (30-minute floor) would re-read an unchanged file forever.
+
+     Taller than the quick-create widget because it has to be: a list two rows
+     high is not a list. targetCellWidth/Height and previewLayout are API 31+
+     and ignored below, where minWidth/minHeight still size it. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="180dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="3"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_reminder_list"
+    android:previewLayout="@layout/widget_reminder_list"
+    android:description="@string/list_widget_description"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen" />

@@ -20,11 +20,13 @@ is consistent with existing practice — but it is more surface that
 | 2 | App shortcuts | hours | 1 | **Done** |
 | 3 | Headless creation broadcast | medium | 1 | **Done** |
 | 4 | Quick-create widget | small | 3 | **Done** |
-| 5 | Reminder list widget | medium | — | not started |
+| 5 | Reminder list widget | medium | — | **Done** |
 
 Recommended order is 1 → 2 → 3 → 4 → 5. Phases 1–2 deliver most of the
 practical "create a reminder fast" value for a fraction of a widget's cost;
 phase 5 is the most work and the most design-dependent, so it goes last.
+
+All five are shipped.
 
 ---
 
@@ -639,6 +641,96 @@ so this is screenshots and manual widget placement on the emulator.
 
 **Medium — 2 to 4 days**, weighted toward layout and theming iteration rather
 than logic.
+
+### Result — done
+
+Shipped as `ReminderListWidgetProvider.kt` + `ReminderListWidgetService.kt` +
+`WidgetSnapshot.kt`, two layouts, two drawables, a widget-info XML, one bridge
+method, and `src/lib/widget.ts`. The snapshot design held up exactly as
+sketched: Kotlin never opens `reminders.db`, `formatEpoch`/`describeRepeat`
+stay in TypeScript, and because the snapshot lives in SharedPreferences the
+widget renders real reminders on a device that has not opened the app in weeks.
+
+Decisions the sketch left open:
+
+- **`RemoteViewsService`, not `RemoteCollectionItems` and not a version
+  branch.** The API-31 floor is real, but one code path that works on 26 is
+  cheaper than two, and the pre-31 plumbing is ~90 lines for a list this
+  simple. `minSdk` was not raised.
+- **Rows carry no icons.** `ReminderListEntry.vue` prefixes both lines with a
+  Font Awesome glyph; hand-authoring vector equivalents buys little, since a
+  repeat rule never reads as a date.
+- **Row taps open the app on the reminder list**, via a new navigate-only
+  `remindme://reminders` deep link — a list widget whose rows do nothing reads
+  as broken. It is parsed without touching its query string on both sides,
+  because the filter is `BROWSABLE`: a host documented as "just open the list"
+  must not become a second create surface outside phase 1's replay guard.
+- **The staleness caveat resolved better than feared.** Case 1 (a fired
+  one-shot) is dropped at render time — a deliberate divergence from the app,
+  which keeps such a row while its notification is still in the drawer because
+  the snooze buttons need it; a glance surface has no such duty. Case 2 mostly
+  evaporates: a repeating reminder shows its *rule*, not a timestamp, exactly
+  as the app does, so a fired occurrence leaves the row correct. Case 3
+  (background snooze / headless create with the app closed) is accepted as
+  designed.
+
+Two things cost real time and are worth reading before touching this again:
+
+- **A full `updateAppWidget` from the app is silently dropped when the
+  RemoteViews carry a `setRemoteAdapter`.** The platform logs "Trying to notify
+  widget update deferred" and only the `APPWIDGET_UPDATE` broadcast's own
+  `onUpdate` gets through. The failure is lopsided and therefore confusing: the
+  *rows* keep refreshing, because the host re-queries the `RemoteViewsFactory`
+  directly, so what you see is a current list painted in a stale palette —
+  light text on a dark panel after a theme change. `partiallyUpdateAppWidget`
+  with a chrome-only RemoteViews merges into the stored views and lands. Two
+  plausible-sounding non-fixes were tried and did not help: bouncing the call
+  through a broadcast to the provider (main thread, receiver dispatch) and
+  `updateAppWidget(ComponentName, …)`.
+- **A colour pushed in the snapshot is a plain int, so it cannot follow the
+  system night setting** the way a `@color` with a `values-night` variant does
+  — and nothing could repaint it, since Android delivers no
+  configuration-change broadcast a manifest receiver may subscribe to. With
+  theme = 'system' that left the widget in whichever scheme was current at the
+  last push. `RemoteViews.setColorInt(viewId, method, notNight, night)` exists
+  for precisely this: it carries both values and the host chooses per its own
+  configuration, every time it applies. API 31+, so below that a 'system' theme
+  resolves once at push time and a `systemPrefersDark` watcher re-pushes while
+  the app is running.
+
+Theming otherwise works as the phase-4 notes predicted it could: the panel is
+an ImageView holding a white rounded rect recoloured with
+`ImageView.setColorFilter` (tinting a rounded *background* is impossible below
+API 31), so the widget follows the user's accent seed and, unlike phase 4's,
+the app's own light/dark/system setting rather than the system's.
+
+### Verification — what was actually run
+
+Emulator (API 37), on debug **and** on the signed minified release APK; widget
+placed by hand from the launcher's picker. CDP evals do not reach
+`RemoteViews`, so this is screenshots plus `WIDGET_SNAPSHOT.xml` reads.
+
+- Picker preview, placement at 4×3, scrolling past the visible rows.
+- Snapshot round-trip: reminders created by the phase-3 broadcast appear in
+  `WIDGET_SNAPSHOT.xml` and then in the widget, with a repeating reminder
+  showing "Every Tuesday at 9:00 AM" rather than a date.
+- Live accent changes (blue → magenta → green → red → teal) repaint chrome,
+  row text and dividers, on debug and on the signed release build.
+- All four theme combinations: app light / dark / system crossed with
+  `cmd uimode night no|yes`. App-explicit wins over the system setting; with
+  'system', flipping night mode repaints the widget correctly **with the app
+  closed** (the `setColorInt` path).
+- Row tap opens the app on the Scheduled Reminders tab, from cold start; "+"
+  opens the New Reminder form and leaves a half-typed one alone.
+- `remindme://reminders?details=INJECTED&at=…` creates nothing.
+- Empty list shows "No reminders scheduled"; after `pm clear`, with no snapshot
+  at all, it shows "Open Remind Me to see your reminders" in the static
+  fallback palette.
+- Not exercised: two instances placed at once. All instances render the same
+  list by construction, and the per-instance parts (the adapter's uniqueness
+  data URI, the per-id partial-update loop) have no shared state — but the
+  launcher's drag-and-drop would not cooperate, so this is untested rather than
+  verified.
 
 ---
 
