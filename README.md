@@ -124,10 +124,13 @@ distinguishable from a deliberate duplicate.
 
 ```
 remindme://reminders
+remindme://reminders?id=1868163329
 ```
 
-Opens the app on the scheduled-reminder list. It never creates anything, and any query
-parameters are ignored — this is what the Reminders widget's rows fire.
+Opens the app on the scheduled-reminder list — the second form on that reminder's details
+dialog, which is what the Reminders widget's rows fire. `id` is the only parameter read;
+`details` and `at` are ignored here, so this host never creates anything. An id that is
+not a positive integer, or names a reminder that no longer exists, just shows the list.
 
 ## Development
 

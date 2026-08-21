@@ -90,6 +90,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue';
 import AppDialog from '~components/AppDialog.vue';
 import EditReminderDialog from '~components/EditReminderDialog.vue';
 import ReminderListEntry from '~components/ReminderListEntry.vue';
+import { details_request } from '~lib/createRequest.ts';
 import { DB } from '~lib/db.ts';
 import { notification_manager, onRemindersChanged } from '~lib/notifications.ts';
 import { HomeTabs, useRouterStore } from '~stores/router.ts';
@@ -111,11 +112,40 @@ const menu_for = ref<Reminder | null>(null);
 const edit_for = ref<Reminder | null>(null);
 const delete_for = ref<Reminder | null>(null);
 
+/**
+ * The in-flight reload, so a widget's details request can wait for it — see
+ * applyDetailsRequest.
+ */
+let refreshing: Promise<void> | null = null;
+
 async function getReminders(): Promise<void> {
   loading.value = true;
-  await notification_manager.cleanExpired();
-  reminders.value = await DB.getAll();
+  refreshing = (async (): Promise<void> => {
+    await notification_manager.cleanExpired();
+    reminders.value = await DB.getAll();
+  })();
+  await refreshing;
   loading.value = false;
+}
+
+/**
+ * Open the details dialog for the reminder a widget row asked for
+ * (`remindme://reminders?id=N`, PLAN.md phase 6) — in-app parity with tapping
+ * the same row inside the app.
+ *
+ * Resolved only once the launch reload settles, so a row cleanExpired() is
+ * about to sweep isn't shown as though it were still scheduled. A miss is the
+ * expected path and not an error: the reminder was deleted while the app was
+ * closed, or it was a one-shot snoozed from a notification, which mints a
+ * fresh id (repeating reminders keep theirs across fires). Landing on the
+ * plain list is the right answer for that, the same as for an id Kotlin
+ * refused to parse — which arrives here as no request at all.
+ */
+async function applyDetailsRequest(id: number | null): Promise<void> {
+  if (id === null) return;
+  details_request.value = null;
+  await refreshing;
+  details_for.value = await DB.getById(id);
 }
 
 // The context menu and the details dialog both route here.
@@ -147,6 +177,10 @@ async function syncReminders(): Promise<void> {
 
 onMounted(() => {
   void getReminders();
+  // Checked on mount, not just watched: a request delivered before this tab
+  // was ever rendered (a cold start on the landing page, say) would otherwise
+  // never be picked up — same reason NewReminderTab checks its prefill.
+  void applyDetailsRequest(details_request.value);
   // Keep the list in sync when reminders fire/snooze/cancel/update elsewhere
   unsubscribe = onRemindersChanged(() => void syncReminders());
 });
@@ -161,6 +195,11 @@ watch(
     if (tab === HomeTabs.ScheduledReminders) void getReminders();
   },
 );
+
+// Deliberately registered after the tab watcher above: a warm deep link sets
+// the id and *then* switches tabs, and watchers run in creation order, so the
+// reload is already in flight by the time applyDetailsRequest awaits it.
+watch(details_request, (id) => void applyDetailsRequest(id));
 
 defineExpose({ refresh: getReminders });
 </script>

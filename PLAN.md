@@ -21,12 +21,14 @@ is consistent with existing practice — but it is more surface that
 | 3 | Headless creation broadcast | medium | 1 | **Done** |
 | 4 | Quick-create widget | small | 3 | **Done** |
 | 5 | Reminder list widget | medium | — | **Done** |
+| 6 | Open a reminder from the widget | hours | 5 | **Done** |
 
 Recommended order is 1 → 2 → 3 → 4 → 5. Phases 1–2 deliver most of the
 practical "create a reminder fast" value for a fraction of a widget's cost;
 phase 5 is the most work and the most design-dependent, so it goes last.
 
-All five are shipped.
+All six phases are shipped. Phase 6 was a follow-on that only became worth
+describing once phase 5 existed.
 
 ---
 
@@ -721,7 +723,10 @@ placed by hand from the launcher's picker. CDP evals do not reach
   'system', flipping night mode repaints the widget correctly **with the app
   closed** (the `setColorInt` path).
 - Row tap opens the app on the Scheduled Reminders tab, from cold start; "+"
-  opens the New Reminder form and leaves a half-typed one alone.
+  opens the New Reminder form and leaves a half-typed one alone. (Read this
+  row-tap bullet with phase 6's warning in mind: it was taken over an existing
+  binding, the state in which a just-placed widget's tap-swallowing does not
+  show.)
 - `remindme://reminders?details=INJECTED&at=…` creates nothing.
 - Empty list shows "No reminders scheduled"; after `pm clear`, with no snapshot
   at all, it shows "Open Remind Me to see your reminders" in the static
@@ -731,6 +736,208 @@ placed by hand from the launcher's picker. CDP evals do not reach
   data URI, the per-id partial-update loop) have no shared state — but the
   launcher's drag-and-drop would not cooperate, so this is untested rather than
   verified.
+
+---
+
+## Phase 6 — Open a reminder from the widget
+
+Today every row of the reminder-list widget opens the same place: the app, on
+the Scheduled Reminders tab. Tapping *the row for the dentist appointment*
+should open the details dialog for that reminder, which is what tapping the
+same row inside the app already does (`ReminderListEntry.vue` emits
+`showDetails` on a tap; a long-press is what opens edit/delete). In-app parity
+is the whole specification here — the details dialog, not the edit dialog, and
+not a different screen.
+
+Nothing about phase 5 blocks this; it was left out because the widget had no
+use for a reminder id and shipping one would have meant relaxing a rule that
+was there for a reason (below). Two things are missing:
+
+- the snapshot's rows carry `{details, meta, fireAt, repeating}` and no `id`
+- every row shares one `PendingIntent` template with an **empty** fill-in
+  intent, because all of them went to the same screen
+
+### The load-bearing decision: letting `remindme://reminders` read a query param
+
+The `reminders` host currently refuses to look at its query string at all, on
+both sides, and that refusal is deliberate: the filter is `BROWSABLE`, so any
+web page can fire one, and phase 1's replay guard only covers *creating*
+requests. Phase 6 has to relax that, so relax it on the record rather than
+quietly:
+
+- **Reading a reminder is not creating one.** `remindme://reminders?id=N` opens
+  a dialog showing text the user already wrote. The worst a hostile caller
+  achieves is opening the app on some reminder of the user's own — no write, no
+  new row, nothing to deduplicate, so no replay guard is needed either.
+- **Parse it narrowly**: a positive integer, nothing else, and a miss is not an
+  error — fall back to the plain list. `details` and `at` stay unread on this
+  host; the `isCreate` split in `MainActivity.kt` must keep returning false for
+  it, or the guard bookkeeping starts tracking a request that creates nothing.
+
+If that trade ever looks uncomfortable, the alternative is a *separate* host
+(`remindme://reminder?id=N`) with its own filter, which buys nothing except a
+tidier story — the reachability is identical.
+
+### The thing that will bite
+
+`Intent.fillIn()` does not overwrite a field the template already set. Phase 5
+put the whole URI on the template precisely to sidestep that rule, so phase 6
+has to undo it: the template keeps the component and action, and each row's
+fill-in supplies the data URI. Get this backwards and every row silently opens
+the plain list — which is exactly what it does today, so the "before" and the
+broken "after" are indistinguishable in a screenshot.
+
+### Stale ids are normal, not an error case
+
+The snapshot is only ever written by the frontend, so a widget row can name an
+id that no longer exists. This is the expected path, not a defect:
+
+- a reminder deleted while the app was closed
+- a one-shot **snoozed from a notification**, which mints a fresh id
+  (`snooze()` in `src/lib/notifications.ts`), so the row's id is gone even
+  though the reminder is not
+
+A repeating reminder keeps its id across fires — `advanceRepeat()` re-inserts
+the same row — so those stay resolvable. Landing on the list is the correct
+outcome for a miss, and it is the same thing an unparseable id should do.
+
+### Snapshot compatibility
+
+Adding `id` to the rows does **not** need a `SNAPSHOT_VERSION` bump. The
+version exists for a change Kotlin cannot read defensively, and this is the
+opposite: an old build reading the new JSON ignores the extra field, and the
+new build reading an old snapshot (SharedPreferences survives an app update)
+finds no id and falls back to the list — which is precisely the miss path
+above. Don't bump it reflexively.
+
+While the rows have ids, `ReminderListFactory.getItemId()` can return the
+reminder id and `hasStableIds()` can become true, which is a small nicety for
+list-update behaviour rather than a reason to do any of this.
+
+### Files
+
+- `src/lib/widget.ts` — `id` on `SnapshotRow`
+- `WidgetSnapshot.kt` — parse it
+- `ReminderListWidgetService.kt` — per-row fill-in intent; `getItemId` /
+  `hasStableIds`
+- `ReminderListWidgetProvider.kt` — strip the data URI off the row template
+- `MainActivity.kt` — read `id` on the `reminders` host only
+- `src/lib/createRequest.ts` — route it; a module-level request ref plus a
+  watch, mirroring how `prefill_request` reaches `NewReminderTab.vue`
+- `ReminderListTab.vue` — apply it to the `details_for` ref that already drives
+  the dialog, on mount *and* via watch, since the request can arrive before the
+  tab has ever rendered
+- README.md — the `id` parameter joins the documented deep-link surface
+
+### Verification
+
+Screenshots plus in-app state, as phase 5. The cases that matter: a row opens
+*its own* reminder and not the first one (tap several different rows), a
+deleted reminder's row lands on the list, a snoozed one-shot's row lands on the
+list, a repeating reminder's row still resolves after it has fired, cold start
+as well as warm, and `remindme://reminders?id=999999` plus
+`remindme://reminders?id=notanumber` both open the list quietly. Signed release
+APK as well as debug.
+
+### Estimate
+
+**Hours.** No new Android surface, no new resources, no theming. The only real
+thinking is the query-param decision above; the rest is wiring.
+
+### Result — done
+
+Built as planned, on the files the plan listed. The snapshot's rows gained an
+`id` (no `SNAPSHOT_VERSION` bump — an old snapshot simply has no id and its
+rows fall back to the plain list, which is the miss path anyway), `MainActivity`
+reads `id` on the `reminders` host only, and a `details_request` ref carries it
+to `ReminderListTab.vue`, which resolves it against the DB and drives the same
+`details_for` ref a tap does.
+
+Two things the plan did not predict:
+
+- **A widget just dropped from the picker swallows the next taps**, which
+  looks precisely like the fill-in bug the plan warned about: no launch, no
+  logcat entry, nothing to see in a screenshot. It sent this phase down a
+  bisect that "proved" `hasStableIds() = true` broke row taps — it does not;
+  the control build was installed *over* an existing binding and so was never
+  in the swallowing state. Stable ids are on, as the plan suggested, with
+  `getItemId` falling back to a negated position for the id-less rows an
+  older snapshot carries. Lesson recorded in [CLAUDE.md](CLAUDE.md): confirm a
+  widget tap with `dumpsys activity activities | grep topResumedActivity`, and
+  interact with the launcher after placing before believing anything.
+- **The row template and the header tap had to stop sharing a builder.**
+  `openList()` served both; stripping the data URI off it for the template
+  would have left the header sending an ACTION_VIEW with no data, which
+  `extractCreateRequest()` reads as "not a request at all" — the app would open
+  on whatever tab it last had. Split into `openList()` (data, immutable) and
+  `rowTemplate()` (no data, mutable), both built from one `listIntent()`.
+
+The details-dialog request is applied on mount *and* via a watch registered
+**after** the tab watcher, so a warm deep link's reload is already in flight
+when `applyDetailsRequest` awaits it; the id resolves after `cleanExpired()`
+rather than before, so a row the sweep is about to remove doesn't open as
+though it were still scheduled.
+
+### Verification — what was actually run
+
+Emulator (API 37), debug and signed release, widget placed by hand. On debug,
+CDP evals read `.details-body` to prove *which* reminder opened — the case a
+screenshot is worst at; on release (no webview debugging) that is screenshots,
+and every tap's landing was confirmed with `dumpsys activity activities`.
+
+Debug, on the shipped build:
+
+- Rows open their own reminder, never the first: row 1, 2 and 3 each matched.
+  An earlier build of the same change was run against four rows including a
+  repeating one ("Weekly standup", "Alpha1/2/3 task").
+- Cold start (`am kill`, process confirmed gone) resolves the same way. Note
+  `am force-stop` is *not* a valid cold-start test here: it cancels the app's
+  PendingIntents, so the widget's taps stay dead until a full `onUpdate`, which
+  a snapshot push cannot deliver (it sends a partial update).
+- Deleted reminder (row deleted straight from SQLite so the snapshot stayed
+  stale) → plain list, no dialog.
+- `?id=999999`, `?id=notanumber`, `?id=-5` and bare `remindme://reminders` all
+  open the list quietly.
+- `remindme://reminders?id=<real>&details=INJECTED&at=<future>` opens that
+  reminder's dialog and creates nothing.
+
+Debug, on the immediately preceding build (frontend identical; only the
+`hasStableIds` flag differed, which no part of these paths reads):
+
+- One-shot fired and then snoozed from the shade with the app dead → its stale
+  row lands on the list, and the drained journal shows the reminder alive under
+  a fresh id.
+- Repeating reminder that had already fired several times still resolves.
+
+Signed release APK, fresh install and fresh placement:
+
+- Row 2 and row 3 each open their own reminder, row 3 from a cold start.
+- `?id=999999` opens the list quietly.
+- Re-seeding the accent with the widget on screen repaints it and the next row
+  tap still opens its own reminder — the case `hasStableIds() = true` newly
+  exercises, since the host asks `getItemId` while recycling.
+
+### Adjacent, and deliberately not planned: a form inside the widget
+
+Asked and answered while phase 5 was being verified, recorded so it does not
+get re-litigated. A reminder form cannot live *in* the widget: `RemoteViews`
+inflates only the ~23 framework classes annotated `@RemoteView`, `EditText` is
+not among them, and `RemoteViews.setRemoteInputs()` — which would attach a
+`RemoteInput` — is `@hide`. Verified against the API 36 sources, not from
+memory.
+
+A modal *is* possible, as a dialog-themed Activity launched by the widget's "+"
+`PendingIntent`, floating over the wallpaper the way the platform Clock's "new
+timer" does. The cost is what rules it out for now: the reminder form is Vue
+inside the single activity Tauri owns, so the modal would have to be
+hand-written native views — a second implementation of the form, inheriting
+phase 3's "no repeat rules" limit for the same reason (they live in
+`repeat.ts`). A second Tauri activity is not the way out either: the
+scaffolding assumes one, and cold-starting a webview is far too slow for
+something that has to feel instant.
+
+The "+" button opening the New Reminder tab stays the answer. It is a task
+switch rather than a modal, but nothing is missing from it — repeats included.
 
 ---
 

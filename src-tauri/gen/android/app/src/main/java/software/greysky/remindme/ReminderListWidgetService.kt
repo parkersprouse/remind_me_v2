@@ -2,6 +2,7 @@ package software.greysky.remindme
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 
@@ -90,10 +91,19 @@ private class ReminderListFactory(private val context: Context) :
       it.divider
     }
 
-    // Rows all open the same place, so the fill-in intent is empty and the
-    // template (set by the provider) carries everything. It still has to be
-    // set: without a fill-in intent the template never fires.
-    views.setOnClickFillInIntent(R.id.widget_row, Intent())
+    // A collection's children cannot carry their own PendingIntent, so the
+    // row supplies only what distinguishes it — its data URI — and the
+    // launcher merges that into the provider's template, which holds action,
+    // component and flags. This works precisely because that template leaves
+    // the data unset: Intent.fillIn refuses to overwrite a field the template
+    // already filled (PLAN.md, phase 6).
+    //
+    // Falling back to the plain list for an id-less row is the same miss path
+    // an id that no longer exists takes; it happens only while a snapshot
+    // written before phase 6 is still in prefs.
+    val uri =
+      if (row.id > 0) "remindme://reminders?id=${row.id}" else "remindme://reminders"
+    views.setOnClickFillInIntent(R.id.widget_row, Intent().setData(Uri.parse(uri)))
     return views
   }
 
@@ -101,12 +111,15 @@ private class ReminderListFactory(private val context: Context) :
 
   override fun getViewTypeCount(): Int = 1
 
-  override fun getItemId(position: Int): Long = position.toLong()
-
   /**
-   * False, honestly: rows are identified by position here (the snapshot
-   * carries no reminder ids — nothing in the widget needs one, since every row
-   * opens the same screen), so an id is only stable until the list changes.
+   * The reminder's own id since phase 6. A snapshot written before it carries
+   * none, and every such row would report 0 — duplicate ids with stable ids
+   * enabled is how a list recycles the wrong view — so those fall back to a
+   * position-derived id, negated so it can never collide with a real one.
    */
-  override fun hasStableIds(): Boolean = false
+  override fun getItemId(position: Int): Long =
+    rows.getOrNull(position)?.id?.takeIf { it > 0 } ?: -(position + 1L)
+
+  /** True now that rows carry reminder ids; only affects list-update behaviour. */
+  override fun hasStableIds(): Boolean = true
 }

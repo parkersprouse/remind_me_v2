@@ -60,6 +60,14 @@ const MAX_ROWS = 100;
 
 interface SnapshotRow {
   details: string;
+  /**
+   * The reminder's own id, so a widget row can open *that* reminder's details
+   * dialog (PLAN.md, phase 6). A row may name an id that no longer exists —
+   * a reminder deleted while the app was closed, or a one-shot snoozed from a
+   * notification, which mints a fresh id — which is the expected path, not a
+   * defect: the deep link falls back to the plain list.
+   */
+  id: number;
   /** The line under the details: a timestamp, or the repeat rule. */
   meta: string;
   /** Only meaningful for one-shots; what the widget's render-time filter reads. */
@@ -87,6 +95,7 @@ export async function pushWidgetSnapshot(): Promise<void> {
     const spec = parseRepeat(reminder.repeat);
     return {
       details: reminder.details,
+      id: reminder.id,
       // Same split as ReminderListEntry.vue: a repeating reminder shows its
       // rule, since its stored one-shot date goes stale the moment it fires.
       meta: spec === null ? formatEpoch(reminder.scheduledForEpochMillis) : describeRepeat(spec),

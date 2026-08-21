@@ -24,7 +24,8 @@ private const val HANDLED_ACTION_KEY = "handledNotificationAction"
 
 /**
  * A `remindme://` deep link or ACTION_SEND share-text hand-off, parsed from
- * the launching intent (PLAN.md, phase 1; the `reminders` host is phase 5).
+ * the launching intent (PLAN.md, phase 1; the `reminders` host is phases 5
+ * and 6).
  * `replayKey` is what makes the request idempotent across a replayed intent
  * (see fingerprint()) — the full URI for a deep link (a caller-supplied `key`
  * query param just rides along as part of it), or the shared text itself for
@@ -38,10 +39,17 @@ private data class CreateRequest(
   /**
    * Which surface the request asks for: "new" (the New Reminder form) or
    * "list" (the scheduled-reminder list, PLAN.md phase 5). A "list" request
-   * is navigation and nothing else — see extractCreateRequest, which does not
-   * even read that host's query string.
+   * is navigation and nothing else — see extractCreateRequest, which reads
+   * only `id` from that host's query string.
    */
   val target: String,
+  /**
+   * Which reminder a "list" request wants opened, from `?id=` (PLAN.md,
+   * phase 6 — a widget row asking for its own reminder's details dialog).
+   * Null everywhere else, and null for an id that did not parse: a miss just
+   * shows the plain list.
+   */
+  val reminderId: Long? = null,
 ) {
   /**
    * Whether this request would actually create a reminder. A bare
@@ -409,12 +417,23 @@ class MainActivity : TauriActivity() {
             }
             CreateRequest(details, atMillis, "deeplink", uri.toString(), "new")
           }
-          // Navigate-only (PLAN.md, phase 5): open the reminder list. The
-          // query string is deliberately not read — details and at are nulled
-          // by construction, so isCreate stays false and this host cannot
-          // become a create surface reachable from any web page (the filter
-          // is BROWSABLE). src/lib/createRequest.ts mirrors the same refusal.
-          "reminders" -> CreateRequest(null, null, "deeplink", uri.toString(), "list")
+          // Navigate-only (PLAN.md, phases 5 and 6): open the reminder list,
+          // optionally on one reminder's details dialog. Exactly one query
+          // parameter is read, narrowly — a positive integer `id`, with a
+          // miss falling back to the plain list. details and at stay unread
+          // and nulled by construction, so isCreate stays false and this host
+          // cannot become a create surface reachable from any web page (the
+          // filter is BROWSABLE); reading an id only opens a dialog over text
+          // the user already wrote, which needs no replay guard because it
+          // writes nothing. src/lib/createRequest.ts mirrors both halves.
+          "reminders" -> CreateRequest(
+            null,
+            null,
+            "deeplink",
+            uri.toString(),
+            "list",
+            uri.getQueryParameter("id")?.toLongOrNull()?.takeIf { it > 0 },
+          )
           else -> null
         }
       }
@@ -500,6 +519,7 @@ class MainActivity : TauriActivity() {
       put("atMillis", request.atMillis ?: JSONObject.NULL)
       put("source", request.source)
       put("target", request.target)
+      put("reminderId", request.reminderId ?: JSONObject.NULL)
     }
     wv.evaluateJavascript(
       "window.androidCreateRequest ? window.androidCreateRequest($payload) : false"

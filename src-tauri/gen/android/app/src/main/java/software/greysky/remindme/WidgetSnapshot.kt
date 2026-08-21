@@ -55,6 +55,13 @@ object WidgetSnapshot {
 
   /** One reminder, formatted by the frontend. */
   data class Row(
+    /**
+     * The reminder's own id, so the row can deep-link to *its* details dialog
+     * (PLAN.md, phase 6). 0 when the snapshot predates phase 6 — prefs survive
+     * an app update — and the row then falls back to opening the plain list,
+     * which is the same miss path an id that no longer exists takes.
+     */
+    val id: Long,
     val details: String,
     /** Timestamp for a one-shot, repeat rule for a repeating reminder. */
     val meta: String,
@@ -195,6 +202,7 @@ object WidgetSnapshot {
       if (details.isEmpty()) continue
       rows.add(
         Row(
+          id = item.optLong("id"),
           details = details,
           meta = item.optString("meta"),
           fireAt = item.optLong("fireAt"),

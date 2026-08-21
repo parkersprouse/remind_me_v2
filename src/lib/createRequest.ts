@@ -31,6 +31,12 @@ interface RawCreateRequest {
    * navigation only and never creates anything.
    */
   target: 'new' | 'list';
+  /**
+   * Which reminder the list request wants opened, from `?id=` on the
+   * `reminders` host (PLAN.md, phase 6 — a widget row asking for *its own*
+   * reminder). Null for the plain list, and for every other target.
+   */
+  reminderId: number | null;
 }
 
 /** A create request that couldn't be auto-created and needs the user's input. */
@@ -45,6 +51,16 @@ export interface PrefillRequest {
  * a request can arrive before the tab has ever been rendered) and clears it.
  */
 export const prefill_request = ref<PrefillRequest | null>(null);
+
+/**
+ * Reminder id a `remindme://reminders?id=N` request wants the details dialog
+ * opened for (PLAN.md, phase 6). Consumed by ReminderListTab.vue the same way
+ * prefill_request reaches NewReminderTab: on mount as well as via watch, since
+ * the request can arrive before that tab has ever been rendered. An id that no
+ * longer resolves is the expected miss path, not an error — the tab just shows
+ * the list.
+ */
+export const details_request = ref<number | null>(null);
 
 declare global {
   interface Window {
@@ -79,13 +95,19 @@ async function handleCreateRequest(request: RawCreateRequest): Promise<void> {
   const router = useRouterStore();
   const granted = await permissions.status();
 
-  // `remindme://reminders` only asks for the list (PLAN.md, phase 5). It is
-  // deliberately read as pure navigation on both sides — MainActivity.kt does
-  // not even parse this host's query string — because the deep-link filter is
-  // BROWSABLE, so any web page can send one; letting details/at ride along
+  // `remindme://reminders` only asks for the list, optionally for one
+  // reminder's details dialog (PLAN.md, phases 5 and 6). It reads exactly one
+  // query parameter — `id`, a positive integer — and `details`/`at` stay
+  // unread on both sides (MainActivity.kt mirrors this). The deep-link filter
+  // is BROWSABLE, so any web page can send one: reading an id opens a dialog
+  // over text the user already wrote, while letting details/at ride along
   // would turn a host documented as navigate-only into a second create
   // surface, outside the replay guard that create requests are covered by.
   if (request.target === 'list') {
+    // Set unconditionally, like prefill_request below: the id is a request
+    // waiting for ReminderListTab whenever it mounts, so it must survive an
+    // ungranted-permission start where routing is left to the landing gate.
+    details_request.value = request.reminderId;
     if (granted) {
       router.goTo(Pages.Home);
       router.setTab(HomeTabs.ScheduledReminders);

@@ -12,11 +12,13 @@ import android.widget.RemoteViews
 /**
  * Request codes for this widget's PendingIntents. They matter for more than
  * tidiness: a PendingIntent's identity is (package, request code, type,
- * Intent.filterEquals) — mutability is *not* part of it — so the row template
- * and the "open the list" tap, which wrap the same intent, would otherwise
- * collapse onto one PendingIntent and whichever was created first would
- * decide whether it is mutable. An immutable template silently breaks every
- * row tap.
+ * Intent.filterEquals) — mutability is *not* part of it — so two intents that
+ * compare equal collapse onto one PendingIntent, and with FLAG_UPDATE_CURRENT
+ * whichever call site ran first decides whether it is mutable. An immutable
+ * template silently breaks every row tap. Since phase 6 the row template
+ * carries no data URI, so it no longer compares equal to the "open the list"
+ * tap — but these codes are what makes that a detail rather than the thing
+ * holding the widget together.
  */
 private const val REQUEST_ROW_TEMPLATE = 5001
 private const val REQUEST_OPEN_LIST = 5002
@@ -141,42 +143,58 @@ class ReminderListWidgetProvider : AppWidgetProvider() {
       views.setEmptyView(R.id.widget_list, R.id.widget_empty)
 
       // Children of a collection cannot carry their own PendingIntent; the
-      // list gets a template and each row a fill-in intent. Every row opens
-      // the same place, so the template carries the whole intent and the
-      // fill-in is empty — which also sidesteps Intent.fillIn's rule that a
-      // field already set on the template wins.
-      views.setPendingIntentTemplate(R.id.widget_list, openList(context, REQUEST_ROW_TEMPLATE))
-      views.setOnClickPendingIntent(R.id.widget_title, openList(context, REQUEST_OPEN_LIST))
-      views.setOnClickPendingIntent(R.id.widget_empty, openList(context, REQUEST_OPEN_LIST))
+      // list gets a template and each row a fill-in intent, which the launcher
+      // merges into it. Each row opens its own reminder (PLAN.md, phase 6), so
+      // the data URI is the row's to supply — and Intent.fillIn will only fill
+      // a field the template left unset, which is why the template below sets
+      // action, component and flags but deliberately not data. Getting that
+      // backwards is invisible: every row would quietly open the plain list,
+      // which is exactly what phase 5 did.
+      views.setPendingIntentTemplate(R.id.widget_list, rowTemplate(context))
+      views.setOnClickPendingIntent(R.id.widget_title, openList(context))
+      views.setOnClickPendingIntent(R.id.widget_empty, openList(context))
       views.setOnClickPendingIntent(R.id.widget_new_reminder, newReminder(context))
       return views
     }
 
     /**
-     * Opens the app on the Scheduled Reminders tab. `remindme://reminders` is
-     * navigate-only on both sides — MainActivity.kt does not read this host's
-     * query string at all — so it creates nothing and needs no replay guard.
+     * Opens the app on the Scheduled Reminders tab, for the header and the
+     * empty state. `remindme://reminders` writes nothing and needs no replay
+     * guard; the only query parameter either side reads is the rows' `id`
+     * (PLAN.md, phase 6), and this one carries none.
      */
-    private fun openList(context: Context, requestCode: Int): PendingIntent {
-      val intent = Intent(context, MainActivity::class.java)
-        .setAction(Intent.ACTION_VIEW)
-        .setData(Uri.parse("remindme://reminders"))
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-      // The row template must be MUTABLE — the launcher merges each row's
-      // fill-in intent into it — which is why it also needs its own request
-      // code (see above). Android 14+ only rejects mutable PendingIntents
-      // wrapping *implicit* intents, and this one names its component, so the
-      // rule phase 4's FLAG_IMMUTABLE note cites does not apply here.
-      val mutability =
-        if (requestCode == REQUEST_ROW_TEMPLATE) PendingIntent.FLAG_MUTABLE
-        else PendingIntent.FLAG_IMMUTABLE
-      return PendingIntent.getActivity(
+    private fun openList(context: Context): PendingIntent =
+      PendingIntent.getActivity(
         context,
-        requestCode,
-        intent,
-        PendingIntent.FLAG_UPDATE_CURRENT or mutability,
+        REQUEST_OPEN_LIST,
+        listIntent(context).setData(Uri.parse("remindme://reminders")),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
       )
-    }
+
+    /**
+     * The rows' shared template: everything except the data URI, which each
+     * row fills in with its own `remindme://reminders?id=N` (see
+     * ReminderListWidgetService). Intent.fillIn copies no flags, so
+     * FLAG_ACTIVITY_NEW_TASK has to live here rather than on the row.
+     *
+     * MUTABLE by necessity — a template the launcher cannot merge into is a
+     * template that ignores every fill-in. Android 14+ only rejects mutable
+     * PendingIntents wrapping *implicit* intents; leaving the data unset does
+     * not make this one implicit, since it still names its component, so the
+     * rule phase 4's FLAG_IMMUTABLE note cites does not apply here either.
+     */
+    private fun rowTemplate(context: Context): PendingIntent =
+      PendingIntent.getActivity(
+        context,
+        REQUEST_ROW_TEMPLATE,
+        listIntent(context),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+      )
+
+    private fun listIntent(context: Context): Intent =
+      Intent(context, MainActivity::class.java)
+        .setAction(Intent.ACTION_VIEW)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /** The phase-1 details-less deep link: open the New Reminder form. */
     private fun newReminder(context: Context): PendingIntent {
