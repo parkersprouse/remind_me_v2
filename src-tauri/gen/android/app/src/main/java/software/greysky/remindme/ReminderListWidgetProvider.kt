@@ -23,6 +23,25 @@ import android.widget.RemoteViews
 private const val REQUEST_ROW_TEMPLATE = 5001
 private const val REQUEST_OPEN_LIST = 5002
 private const val REQUEST_NEW_REMINDER = 5003
+private const val REQUEST_REFRESH = 5004
+
+/**
+ * Header refresh button, opposite the "+". Not declared in an intent filter —
+ * same as QuickCreateWidgetProvider's ACTION_QUICK_CREATE — since the
+ * PendingIntent below is explicit and needs no filter match.
+ *
+ * Deliberately does not open the app: Kotlin already holds the last snapshot
+ * the frontend pushed, and everything a tap can usefully do — re-run the
+ * render-time fireAt filter against *now*, dropping a reminder that fired
+ * since the last push — is exactly what refresh() below already does on
+ * every push. This just lets the user ask for that re-evaluation on demand
+ * instead of waiting for the next app resume or list-tab visit (see
+ * App.vue's onResume and ReminderListTab's cleanExpired). It cannot pick up
+ * a reminder actually created or snoozed in the background and not yet
+ * drained — that still needs the app, per the module boundary in
+ * WidgetSnapshot's own header comment.
+ */
+private const val ACTION_REFRESH = "software.greysky.remindme.WIDGET_REFRESH"
 
 /**
  * Home-screen reminder list (PLAN.md, phase 5): a scrolling list of upcoming
@@ -48,6 +67,11 @@ class ReminderListWidgetProvider : AppWidgetProvider() {
     appWidgetIds.forEach { id ->
       appWidgetManager.updateAppWidget(id, buildViews(context, id))
     }
+  }
+
+  override fun onReceive(context: Context, intent: Intent) {
+    if (intent.action == ACTION_REFRESH) refresh(context)
+    super.onReceive(context, intent)
   }
 
   companion object {
@@ -105,6 +129,12 @@ class ReminderListWidgetProvider : AppWidgetProvider() {
         R.id.widget_new_reminder,
         "setColorFilter",
       ) { it.primary }
+      views.setSnapshotColor(
+        context,
+        snapshot,
+        R.id.widget_refresh,
+        "setColorFilter",
+      ) { it.primary }
 
       // One empty view, two truths. "No reminders scheduled" would be a claim
       // about data that has never been read on an install whose widget was
@@ -154,6 +184,7 @@ class ReminderListWidgetProvider : AppWidgetProvider() {
       views.setOnClickPendingIntent(R.id.widget_title, openList(context))
       views.setOnClickPendingIntent(R.id.widget_empty, openList(context))
       views.setOnClickPendingIntent(R.id.widget_new_reminder, newReminder(context))
+      views.setOnClickPendingIntent(R.id.widget_refresh, refreshIntent(context))
       return views
     }
 
@@ -195,6 +226,25 @@ class ReminderListWidgetProvider : AppWidgetProvider() {
       Intent(context, MainActivity::class.java)
         .setAction(Intent.ACTION_VIEW)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /**
+     * A plain broadcast back to this same provider, handled by onReceive
+     * above. No data URI or per-instance distinguishing is needed the way
+     * phase 4's preset buttons required — every placed instance's button
+     * doing the identical "refresh everything" action collapsing onto one
+     * PendingIntent changes nothing observable, since refresh() (see above)
+     * already repaints every instance regardless of which one was tapped.
+     */
+    private fun refreshIntent(context: Context): PendingIntent {
+      val intent = Intent(context, ReminderListWidgetProvider::class.java)
+        .setAction(ACTION_REFRESH)
+      return PendingIntent.getBroadcast(
+        context,
+        REQUEST_REFRESH,
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+      )
+    }
 
     /** The phase-1 details-less deep link: open the New Reminder form. */
     private fun newReminder(context: Context): PendingIntent {

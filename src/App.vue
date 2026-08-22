@@ -149,12 +149,28 @@ async function checkPermission(): Promise<void> {
  * granting the permission in system settings and returning now progresses the
  * user off the landing page automatically.
  */
+/**
+ * Picks up snoozes taken from the drawer, and reminders created by broadcast,
+ * while the app sat in the background (neither reached the webview — see
+ * drainPendingOps). Chained so cleanExpired sees rows a drain just wrote, same
+ * ordering as main.ts's boot sequence — a journalled reminder that already
+ * fired needs its row present for the sweep to reason about it.
+ *
+ * main.ts's own cleanExpired call only runs once, at process start — a warm
+ * resume (the process stayed alive in the background) never reruns it, so
+ * without this a reminder that fired while backgrounded would keep reading as
+ * still-upcoming in both the in-app list and the widget until the user
+ * happened to revisit the Scheduled Reminders tab. Resuming is exactly the
+ * moment a user expects both to already be current.
+ */
+async function syncOnResume(): Promise<void> {
+  await notification_manager.drainPendingOps();
+  await notification_manager.cleanExpired();
+}
+
 function onResume(): void {
   void checkPermission();
-  // Picks up snoozes taken from the drawer, and reminders created by broadcast,
-  // while the app sat in the background (neither reached the webview — see
-  // drainPendingOps).
-  void notification_manager.drainPendingOps();
+  void syncOnResume();
   if (router.on_home_page) router.setTab(HomeTabs.NewReminder);
 }
 

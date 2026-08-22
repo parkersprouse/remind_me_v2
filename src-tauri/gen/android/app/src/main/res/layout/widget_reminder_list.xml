@@ -41,15 +41,27 @@
 
       <TextView
           android:id="@+id/widget_title"
-          android:layout_width="0dp"
+          android:layout_width="wrap_content"
           android:layout_height="wrap_content"
-          android:layout_weight="1"
           android:paddingStart="6dp"
           android:paddingEnd="6dp"
           android:text="@string/list_widget_title"
           android:textSize="16sp"
           android:maxLines="1"
           android:ellipsize="end" />
+
+      <ImageView
+          android:id="@+id/widget_refresh"
+          android:layout_width="40dp"
+          android:layout_height="40dp"
+          android:src="@drawable/ic_widget_refresh"
+          android:scaleType="centerInside"
+          android:contentDescription="@string/list_widget_refresh" />
+
+      <ImageView
+          android:layout_width="0dp"
+          android:layout_height="0dp"
+          android:layout_weight="1" />
 
       <ImageView
           android:id="@+id/widget_new_reminder"

@@ -25,6 +25,7 @@ import {
 } from '~lib/repeat.ts';
 import { useSettingsStore } from '~stores/settings.ts';
 
+import type { Reminder } from '~lib/db.ts';
 import type { RepeatSpec } from '~lib/repeat.ts';
 
 /**
@@ -145,6 +146,27 @@ export function onRemindersChanged(listener: ChangeListener): () => void {
 
 function emitChange(): void {
   for (const listener of change_listeners) listener();
+}
+
+/**
+ * Whether a reminder should still appear in a "what's coming" list — used by
+ * both the in-app list and the widget snapshot builder.
+ *
+ * cleanExpired() deliberately keeps a fired one-shot's DB row while its
+ * notification is still undismissed (the row is what its snooze buttons need
+ * to re-arm), but that is a retention concern, not a display one: a row whose
+ * time has already passed reads as broken sitting in a list of "upcoming"
+ * reminders regardless of whether the drawer notification is still up. So
+ * this filters on time alone, independent of drawer state — a fired one-shot
+ * drops out of both lists the moment it fires, and reappears if snoozed
+ * (which mints a fresh row with a future time).
+ *
+ * A repeating reminder is exempt: its stored time is only its last-armed
+ * occurrence and goes stale the instant it fires (same split as
+ * ReminderListEntry.vue's meta line), not a sign it's done.
+ */
+export function isPendingDisplay(reminder: Pick<Reminder, 'repeat' | 'scheduledForEpochMillis'>, now = Date.now()): boolean {
+  return reminder.repeat !== null || reminder.scheduledForEpochMillis > now;
 }
 
 export const permissions = {
@@ -368,6 +390,13 @@ export const notification_manager = {
       await notification_manager.cancel(reminder.id);
     }
     await rearmRepeats();
+    // cancel() above already emits per removed row, but an undismissed fired
+    // one-shot removes nothing here — it stays in the DB until the drawer
+    // notification clears. The widget still needs to stop showing it as
+    // upcoming the moment it fires (its own render-time filter just needs a
+    // push to re-run against), so emit unconditionally rather than only when
+    // a row was actually deleted.
+    emitChange();
   },
 };
 

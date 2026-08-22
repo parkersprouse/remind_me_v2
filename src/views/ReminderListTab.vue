@@ -92,7 +92,7 @@ import EditReminderDialog from '~components/EditReminderDialog.vue';
 import ReminderListEntry from '~components/ReminderListEntry.vue';
 import { details_request } from '~lib/createRequest.ts';
 import { DB } from '~lib/db.ts';
-import { notification_manager, onRemindersChanged } from '~lib/notifications.ts';
+import { isPendingDisplay, notification_manager, onRemindersChanged } from '~lib/notifications.ts';
 import { HomeTabs, useRouterStore } from '~stores/router.ts';
 
 import type { Reminder } from '~lib/db.ts';
@@ -122,7 +122,10 @@ async function getReminders(): Promise<void> {
   loading.value = true;
   refreshing = (async (): Promise<void> => {
     await notification_manager.cleanExpired();
-    reminders.value = await DB.getAll();
+    // A fired one-shot can still be in the DB here (cleanExpired() keeps its
+    // row while the notification is undismissed, for a drawer snooze), but it
+    // shouldn't read as still-upcoming — see isPendingDisplay.
+    reminders.value = (await DB.getAll()).filter((r) => isPendingDisplay(r));
   })();
   await refreshing;
   loading.value = false;
@@ -172,7 +175,7 @@ async function confirmDelete(): Promise<void> {
 let unsubscribe: (() => void) | undefined;
 
 async function syncReminders(): Promise<void> {
-  reminders.value = await DB.getAll();
+  reminders.value = (await DB.getAll()).filter((r) => isPendingDisplay(r));
 }
 
 onMounted(() => {

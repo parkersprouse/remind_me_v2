@@ -53,4 +53,9 @@
          launch it), and there is no snapshot then. Claiming "no reminders"
          would be asserting something about data nothing has ever read. -->
     <string name="list_widget_never_opened">"Open Remind Me to see your reminders"</string>
+    <!-- Content description for the header's refresh button (opposite the "+"
+         button): re-evaluates the already-pushed snapshot against the current
+         time, dropping rows that fired since the last push, without opening
+         the app. -->
+    <string name="list_widget_refresh">"Refresh"</string>
 </resources>
