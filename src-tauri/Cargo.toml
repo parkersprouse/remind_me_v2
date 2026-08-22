@@ -1,6 +1,6 @@
 [package]
 name = "remind_me"
-version = "1.7.0"
+version = "1.8.0"
 description = "Remind Me! is an app to help you quickly and easily set reminders to make sure you always remember what you need to."
 authors = ["Parker Sprouse"]
 edition = "2021"
