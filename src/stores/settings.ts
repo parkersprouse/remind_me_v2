@@ -28,6 +28,9 @@ const defaults = {
   // When true, the last of Android's three notification action slots holds the
   // "Custom…" button (opening the snooze picker) instead of a third preset.
   notifSnoozeCustomButton: true,
+  // Absolute ("Apr 4, 2026, 12:50 PM") by default — matches existing
+  // behavior for everyone upgrading into this setting.
+  showRelativeTime: false,
 };
 
 // Persistence goes through tauri-plugin-store (settings.json), the moral
@@ -46,6 +49,7 @@ export const useSettingsStore = defineStore('settings', {
     showNotifSnooze: defaults.notifSnooze,
     notifSnoozeOptions: defaults.notifSnoozeOptions,
     notifSnoozeCustomButton: defaults.notifSnoozeCustomButton,
+    showRelativeTime: defaults.showRelativeTime,
     systemPrefersDark: system_dark_query.matches,
   }),
 
@@ -89,6 +93,8 @@ export const useSettingsStore = defineStore('settings', {
       this.notifSnoozeCustomButton =
         (await persisted.get<boolean>('notif_snooze_custom_button')) ??
         defaults.notifSnoozeCustomButton;
+      this.showRelativeTime =
+        (await persisted.get<boolean>('show_relative_time')) ?? defaults.showRelativeTime;
 
       system_dark_query.addEventListener('change', (event) => {
         this.systemPrefersDark = event.matches;
@@ -128,6 +134,11 @@ export const useSettingsStore = defineStore('settings', {
     setNotifSnoozeCustomButton(enabled: boolean) {
       this.notifSnoozeCustomButton = enabled;
       void persisted.set('notif_snooze_custom_button', enabled);
+    },
+
+    setShowRelativeTime(enabled: boolean) {
+      this.showRelativeTime = enabled;
+      void persisted.set('show_relative_time', enabled);
     },
   },
 });

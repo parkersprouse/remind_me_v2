@@ -58,4 +58,10 @@
          time, dropping rows that fired since the last push, without opening
          the app. -->
     <string name="list_widget_refresh">"Refresh"</string>
+    <!-- Toast shown once the refresh button's spin sequence finishes (see
+         ReminderListWidgetProvider.spinAndRefresh). Past tense, matching the
+         quick-create widget's status line above: the row-drop refresh() does
+         is silent otherwise, and a home-screen button that visibly does
+         nothing reads as broken. -->
+    <string name="list_widget_refreshed">"Refreshed"</string>
 </resources>

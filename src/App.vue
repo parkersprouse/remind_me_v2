@@ -79,6 +79,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue';
 import BadgedIcon from '~components/BadgedIcon.vue';
 import SnoozeDialog from '~components/SnoozeDialog.vue';
 import ToasterHost from '~components/ToasterHost.vue';
+import { bumpRelativeClock, startRelativeClock, stopRelativeClock } from '~lib/format.ts';
 import { custom_snooze_request, notification_manager, permissions } from '~lib/notifications.ts';
 import { applyDynamicColor } from '~lib/theme.ts';
 import { ERROR_TOAST, SUCCESS_TOAST, toaster } from '~lib/toaster.ts';
@@ -171,6 +172,7 @@ async function syncOnResume(): Promise<void> {
 function onResume(): void {
   void checkPermission();
   void syncOnResume();
+  bumpRelativeClock();
   if (router.on_home_page) router.setTab(HomeTabs.NewReminder);
 }
 
@@ -221,6 +223,17 @@ watch(
   { immediate: true },
 );
 
+// The relative-time clock only needs to tick while something is actually
+// showing a relative label, so its interval is gated on the setting.
+watch(
+  () => settings.showRelativeTime,
+  (enabled) => {
+    if (enabled) startRelativeClock();
+    else stopRelativeClock();
+  },
+  { immediate: true },
+);
+
 onMounted(() => {
   void checkPermission();
   window.androidResume = onResume;
@@ -228,6 +241,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   delete window.androidResume;
+  stopRelativeClock();
 });
 </script>
 

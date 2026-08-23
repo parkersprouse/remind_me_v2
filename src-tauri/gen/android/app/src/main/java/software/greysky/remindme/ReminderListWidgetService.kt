@@ -22,6 +22,39 @@ class ReminderListWidgetService : RemoteViewsService() {
     ReminderListFactory(applicationContext)
 }
 
+/**
+ * Mirrors formatRelative() in src/lib/format.ts — hand-kept in sync, since
+ * this is the one row of formatting the snapshot's "one language" rule
+ * doesn't cover: a relative label needs a live "now" at draw time, not
+ * anything settings.json or a push from the frontend could supply ahead of
+ * time. See ReminderListWidgetService.getViewAt for where this is used, and
+ * the comment on WidgetSnapshot.Snapshot.relative for why this can't just be
+ * precomputed into row.meta the way formatEpoch/describeRepeat are.
+ */
+private fun formatRelativeTime(fireAtMillis: Long, nowMillis: Long = System.currentTimeMillis()): String {
+  val diffMs = fireAtMillis - nowMillis
+  // A row here always has fireAt in the future — onDataSetChanged already
+  // drops fired one-shots — but clamp anyway rather than trust that filter
+  // from a formatting helper that could be called elsewhere later.
+  if (diffMs <= 0) return "Now"
+
+  val diffMinutes = diffMs / 60_000
+  if (diffMinutes < 1) return "in less than a minute"
+
+  val days = diffMinutes / 1440
+  val hours = (diffMinutes % 1440) / 60
+  val minutes = diffMinutes % 60
+
+  fun plural(n: Long, noun: String): String = "$n $noun${if (n == 1L) "" else "s"}"
+
+  return when {
+    days > 0 -> "in ${plural(days, "day")}"
+    hours > 0 && minutes > 0 -> "in ${plural(hours, "hour")}, ${plural(minutes, "minute")}"
+    hours > 0 -> "in ${plural(hours, "hour")}"
+    else -> "in ${plural(minutes, "minute")}"
+  }
+}
+
 private class ReminderListFactory(private val context: Context) :
   RemoteViewsService.RemoteViewsFactory {
 
@@ -81,7 +114,16 @@ private class ReminderListFactory(private val context: Context) :
     views.setSnapshotColor(context, current, R.id.widget_row_details, "setTextColor") {
       it.onSurface
     }
-    views.setTextViewText(R.id.widget_row_meta, row.meta)
+    // row.meta is what the frontend precomputed (formatEpoch/describeRepeat) —
+    // fine for a repeat rule, which doesn't age, but a relative label sitting
+    // in prefs would be stale the instant time passes (the snapshot is only
+    // rewritten on a reminder mutation or palette change). Formatting it here
+    // instead, from the row's own fireAt against the live clock, is the one
+    // case worth a second copy of the formatting logic — see
+    // formatRelativeTime below and formatRelative() in src/lib/format.ts.
+    val metaText =
+      if (current?.relative == true && !row.repeating) formatRelativeTime(row.fireAt) else row.meta
+    views.setTextViewText(R.id.widget_row_meta, metaText)
     // Pushed as #AARRGGBB: the meta line is drawn at 0.66 alpha over the
     // panel, exactly as ReminderListEntry.vue draws it. Alpha works here
     // because setTextColor blends; it would not survive a color filter, which

@@ -80,6 +80,21 @@
     </section>
 
     <section class='settings-container'>
+      <LabeledSwitch
+        :model-value='settings.showRelativeTime'
+        @update:modelValue='settings.setShowRelativeTime($event)'
+      >
+        <span class='section-title'>
+          <BadgedIcon icon='fa-solid fa-bell' badge='fa-solid fa-clock-rotate-left' :size='17' class='section-icon' />
+          Relative Time
+        </span>
+      </LabeledSwitch>
+      <p class='backup-hint'>
+        Show a reminder's scheduled time as relative (e.g. "in 3 hours") instead of an exact date and time.
+      </p>
+    </section>
+
+    <section class='settings-container'>
       <div class='backup-header'>
         <span class='section-title'>
           <BadgedIcon icon='fa-solid fa-bell' badge='fa-solid fa-floppy-disk' :size='17' class='section-icon' />

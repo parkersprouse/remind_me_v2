@@ -81,6 +81,16 @@ interface Snapshot {
   theme: ThemeMode;
   light: WidgetPalette;
   dark: WidgetPalette;
+  /**
+   * Mirrors settings.showRelativeTime. Unlike meta (formatEpoch/describeRepeat),
+   * a relative label is not precomputed here — it would be stale the instant
+   * time passes, sitting in prefs until the next mutation or palette change.
+   * Kotlin instead formats it from `fireAt` at render time, using the live
+   * clock, the one case where duplicating formatting logic into the widget
+   * beats keeping it in one language. See formatRelativeTime() in
+   * ReminderListWidgetService.kt.
+   */
+  relative: boolean;
   items: SnapshotRow[];
 }
 
@@ -109,6 +119,7 @@ export async function pushWidgetSnapshot(): Promise<void> {
     theme: settings.theme,
     light: widgetPalette(settings.accentColor, 'light'),
     dark: widgetPalette(settings.accentColor, 'dark'),
+    relative: settings.showRelativeTime,
     items,
   };
   bridge.setWidgetSnapshot(JSON.stringify(snapshot));
@@ -135,7 +146,12 @@ export function initWidgetSnapshot(): void {
   // above.
   const settings = useSettingsStore();
   watch(
-    () => [settings.theme, settings.accentColor, settings.systemPrefersDark],
+    () => [
+      settings.theme,
+      settings.accentColor,
+      settings.systemPrefersDark,
+      settings.showRelativeTime,
+    ],
     () => void pushWidgetSnapshot(),
   );
 

@@ -74,6 +74,12 @@ object WidgetSnapshot {
     val theme: String,
     val light: Palette,
     val dark: Palette,
+    /**
+     * Mirrors settings.showRelativeTime. False (absolute) for a snapshot
+     * written before this field existed — prefs survive an app update, and
+     * optBoolean's default below reads that case the same as "off".
+     */
+    val relative: Boolean,
     val rows: List<Row>,
   ) {
     /**
@@ -133,6 +139,7 @@ object WidgetSnapshot {
         theme = root.optString("theme", "system"),
         light = palette(root.optJSONObject("light"), fallbackPalette(context, night = false)),
         dark = palette(root.optJSONObject("dark"), fallbackPalette(context, night = true)),
+        relative = root.optBoolean("relative", false),
         rows = rows(root.optJSONArray("items")),
       )
     } catch (e: Exception) {

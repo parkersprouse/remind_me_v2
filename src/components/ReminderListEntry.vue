@@ -17,9 +17,7 @@
         :class="repeat_spec ? 'fa-solid fa-repeat icon' : 'fa-regular fa-clock icon'"
         aria-hidden='true'
       />
-      <span>{{
-        repeat_spec ? describeRepeat(repeat_spec) : formatEpoch(reminder.scheduledForEpochMillis)
-      }}</span>
+      <span>{{ meta_text }}</span>
     </div>
   </div>
 </template>
@@ -27,8 +25,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-import { formatEpoch } from '~lib/format.ts';
+import { formatEpoch, formatRelative, relative_clock } from '~lib/format.ts';
 import { describeRepeat, parseRepeat } from '~lib/repeat.ts';
+import { useSettingsStore } from '~stores/settings.ts';
 
 import type { Reminder } from '~lib/db.ts';
 
@@ -44,9 +43,22 @@ const emit = defineEmits<{
   longPress: [reminder: Reminder];
 }>();
 
+const settings = useSettingsStore();
+
 // Repeating reminders show their rule instead of a timestamp: the OS keeps
 // re-firing them, so a stored one-shot date would immediately go stale.
 const repeat_spec = computed(() => parseRepeat(props.reminder.repeat));
+
+// relative_clock.value is read only so this recomputes as time passes when
+// the relative-time setting is on; formatEpoch never goes stale, so the
+// absolute branch has no such dependency.
+const meta_text = computed(() => {
+  if (repeat_spec.value) return describeRepeat(repeat_spec.value);
+  if (settings.showRelativeTime) {
+    return formatRelative(props.reminder.scheduledForEpochMillis, relative_clock.value);
+  }
+  return formatEpoch(props.reminder.scheduledForEpochMillis);
+});
 
 const LONG_PRESS_MS = 500;
 const MOVE_CANCEL_PX = 10;

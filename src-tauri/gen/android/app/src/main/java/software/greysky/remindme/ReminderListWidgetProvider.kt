@@ -3,11 +3,16 @@ package software.greysky.remindme
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.widget.RemoteViews
+import android.widget.Toast
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Request codes for this widget's PendingIntents. They matter for more than
@@ -33,15 +38,38 @@ private const val REQUEST_REFRESH = 5004
  * Deliberately does not open the app: Kotlin already holds the last snapshot
  * the frontend pushed, and everything a tap can usefully do — re-run the
  * render-time fireAt filter against *now*, dropping a reminder that fired
- * since the last push — is exactly what refresh() below already does on
- * every push. This just lets the user ask for that re-evaluation on demand
- * instead of waiting for the next app resume or list-tab visit (see
- * App.vue's onResume and ReminderListTab's cleanExpired). It cannot pick up
- * a reminder actually created or snoozed in the background and not yet
- * drained — that still needs the app, per the module boundary in
+ * since the last push, and (when the relative-time setting is on) re-render
+ * every row's meta line against the current clock — is exactly what refresh()
+ * below already does on every push. This just lets the user ask for that
+ * re-evaluation on demand instead of waiting for the next app resume or
+ * list-tab visit (see App.vue's onResume and ReminderListTab's cleanExpired).
+ * It cannot pick up a reminder actually created or snoozed in the background
+ * and not yet drained — that still needs the app, per the module boundary in
  * WidgetSnapshot's own header comment.
+ *
+ * The tap also runs a short spin animation on the button icon and finishes
+ * with a Toast (spinAndRefresh below) — otherwise the actual work is fast
+ * enough that a tap with the app closed produces literally no visible
+ * feedback, which reads as a broken button rather than a no-op.
  */
 private const val ACTION_REFRESH = "software.greysky.remindme.WIDGET_REFRESH"
+
+/**
+ * Flipbook frames for the refresh icon's spin, one per 45° step; frame 0
+ * (unrotated) is the layout's own default, so it isn't repeated here — see
+ * spinAndRefresh, which lands back on it by rebuilding the chrome from
+ * scratch rather than by painting a matching last frame.
+ */
+private val SPIN_FRAMES = intArrayOf(
+  R.drawable.ic_widget_refresh_45,
+  R.drawable.ic_widget_refresh_90,
+  R.drawable.ic_widget_refresh_135,
+  R.drawable.ic_widget_refresh_180,
+  R.drawable.ic_widget_refresh_225,
+  R.drawable.ic_widget_refresh_270,
+  R.drawable.ic_widget_refresh_315,
+)
+private const val SPIN_FRAME_INTERVAL_MS = 90L
 
 /**
  * Home-screen reminder list (PLAN.md, phase 5): a scrolling list of upcoming
@@ -70,11 +98,19 @@ class ReminderListWidgetProvider : AppWidgetProvider() {
   }
 
   override fun onReceive(context: Context, intent: Intent) {
-    if (intent.action == ACTION_REFRESH) refresh(context)
+    // goAsync() keeps the receiver (and its process) alive past onReceive
+    // returning, which the spin's postDelayed loop needs. The guard means a
+    // double-tap mid-spin is a no-op rather than two interleaved sequences
+    // stomping each other's frames and finishing (or Toasting) twice.
+    if (intent.action == ACTION_REFRESH && spinning.compareAndSet(false, true)) {
+      spinAndRefresh(context.applicationContext, goAsync())
+    }
     super.onReceive(context, intent)
   }
 
   companion object {
+    private val spinning = AtomicBoolean(false)
+
     /**
      * Repaint every placed instance, from the snapshot the frontend just
      * pushed (WidgetSnapshot.set). Nothing else would repaint it:
@@ -101,6 +137,57 @@ class ReminderListWidgetProvider : AppWidgetProvider() {
       // skips re-binding the adapter on every push, which was wasted work.
       ids.forEach { id -> manager.partiallyUpdateAppWidget(id, chrome) }
       manager.notifyAppWidgetViewDataChanged(ids, R.id.widget_list)
+    }
+
+    /**
+     * The refresh button's on-tap feedback: paint SPIN_FRAMES onto the icon
+     * one at a time, then do the actual refresh() and finish with a Toast.
+     *
+     * RemoteViews gives no way to hand the launcher a real animation to run —
+     * everything here has to be driven from this side, one partial update per
+     * frame, which is exactly what goAsync()'s PendingResult exists to keep
+     * the receiver alive for. The refresh itself runs *after* the spin,
+     * not before: chromeViews() below always inflates the layout from
+     * scratch, so calling refresh() is also what resets the icon to its
+     * layout default (frame 0) — no separate "reset" step needed — and it
+     * means the Toast and the list visibly updating land together.
+     *
+     * If ids is empty there is nothing to animate or refresh, and no button
+     * was tapped to receive a Toast about it.
+     */
+    private fun spinAndRefresh(context: Context, pendingResult: BroadcastReceiver.PendingResult) {
+      val manager = AppWidgetManager.getInstance(context)
+      val ids = manager.getAppWidgetIds(
+        ComponentName(context, ReminderListWidgetProvider::class.java)
+      )
+      if (ids.isEmpty()) {
+        spinning.set(false)
+        pendingResult.finish()
+        return
+      }
+
+      val handler = Handler(Looper.getMainLooper())
+
+      fun paintFrame(index: Int) {
+        if (index >= SPIN_FRAMES.size) {
+          refresh(context)
+          Toast.makeText(
+            context,
+            context.getString(R.string.list_widget_refreshed),
+            Toast.LENGTH_SHORT,
+          ).show()
+          spinning.set(false)
+          pendingResult.finish()
+          return
+        }
+        val frame = RemoteViews(context.packageName, R.layout.widget_reminder_list).apply {
+          setImageViewResource(R.id.widget_refresh, SPIN_FRAMES[index])
+        }
+        ids.forEach { id -> manager.partiallyUpdateAppWidget(id, frame) }
+        handler.postDelayed({ paintFrame(index + 1) }, SPIN_FRAME_INTERVAL_MS)
+      }
+
+      paintFrame(0)
     }
 
     /**
