@@ -64,4 +64,29 @@
          is silent otherwise, and a home-screen button that visibly does
          nothing reads as broken. -->
     <string name="list_widget_refreshed">"Refreshed"</string>
+    <!-- Content description for the header's mic button, next to the "+"
+         (see list_widget_refresh above for the sibling button's entry). -->
+    <string name="list_widget_voice">"Create reminder by voice"</string>
+
+    <!-- Voice-driven reminder creation: the in-app mic button
+         (MainActivity's startVoiceCapture bridge method, see
+         src/lib/voiceReminder.ts) and the reminder-list widget's headless mic
+         button (VoiceQuickCreateActivity) share the recognizer prompt; the
+         other three strings are specific to the headless path, since the
+         in-app path's feedback is the form populating itself rather than a
+         toast. -->
+    <string name="voice_reminder_prompt">"Say your reminder"</string>
+    <!-- No recognizer activity resolved (RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+         found nothing to launch) — rare, but silently doing nothing on tap
+         would read as a broken button. -->
+    <string name="voice_reminder_no_recognizer">"No speech recognizer available"</string>
+    <!-- SpokenReminderParser understood no time expression it could parse
+         (or, once one was found, no details text survived) — narrower than
+         the in-app parser by design (see SpokenReminderParser's doc comment). -->
+    <string name="voice_reminder_unparseable">"Couldn’t understand that — try again or open the app"</string>
+    <!-- CreateReminderReceiver rejected an otherwise-parsed request (e.g. the
+         details ended up blank after its own trim, or the resolved time fell
+         out of range) — distinct from the parser-level failure above so a
+         reader of the code can tell which layer is responsible. -->
+    <string name="voice_reminder_failed">"Couldn’t create the reminder — try again"</string>
 </resources>

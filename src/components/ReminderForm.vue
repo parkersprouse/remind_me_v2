@@ -1,5 +1,16 @@
 <template>
   <div class='reminder-form'>
+    <button
+      v-if="mode === 'create'"
+      type='button'
+      class='chip chip-pill voice-chip'
+      :disabled='listening'
+      @click='captureVoice'
+    >
+      <i class='fa-solid fa-microphone chip-avatar' aria-hidden='true'/>
+      {{ listening ? 'Listening…' : 'Speak Reminder' }}
+    </button>
+
     <DetailsInput v-model='form.details' />
 
     <template v-if='repeat === null'>
@@ -65,6 +76,8 @@ import RepeatEditor from '~components/RepeatEditor.vue';
 import TimePickerDialog from '~components/TimePickerDialog.vue';
 import { durationToMinutes } from '~lib/duration.ts';
 import { formatDate, formatTimeOfDay } from '~lib/format.ts';
+import { ERROR_TOAST, toaster } from '~lib/toaster.ts';
+import { captureSpokenReminder } from '~lib/voiceReminder.ts';
 import { useSettingsStore } from '~stores/settings.ts';
 
 import type { DurationOption } from '~lib/duration.ts';
@@ -110,6 +123,7 @@ const repeat = ref<RepeatSpec | null>(props.initialRepeat);
 
 const show_date_picker = ref(false);
 const show_time_picker = ref(false);
+const listening = ref(false);
 
 const date_time = computed(() => {
   const dt = new Date(form.date);
@@ -153,6 +167,29 @@ function submit(): void {
 }
 
 /**
+ * Speak-a-reminder: launches the system speech recognizer and applies the
+ * parsed result the same way an external prefill request would (see
+ * captureSpokenReminder in voiceReminder.ts). A deliberate cancel (the user
+ * backed out of the recognizer dialog) is silent; anything else that didn't
+ * produce a usable reminder gets an error toast so the user knows to retry or
+ * type it themselves, per the reason chrono-node runs in this app and not in
+ * the widget's headless Kotlin path.
+ */
+async function captureVoice(): Promise<void> {
+  listening.value = true;
+  try {
+    const result = await captureSpokenReminder();
+    if (result.status === 'ok') {
+      prefill(result.details, result.dateTime);
+    } else if (result.status !== 'cancelled') {
+      toaster.show('Couldn’t Understand That', ERROR_TOAST);
+    }
+  } finally {
+    listening.value = false;
+  }
+}
+
+/**
  * Applies an externally-supplied create request (see src/lib/createRequest.ts):
  * fills details and, when a time came with it, the date/time chips too. Always
  * clears any in-progress repeat rule — an external request can't express one.
@@ -177,6 +214,16 @@ defineExpose({
 .reminder-form {
   display: flex;
   flex-direction: column;
+}
+
+.voice-chip {
+  align-self: center;
+  margin-bottom: 16px;
+}
+
+.voice-chip:disabled {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .datetime-row {

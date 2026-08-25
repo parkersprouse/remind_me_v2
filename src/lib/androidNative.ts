@@ -36,6 +36,13 @@ export interface AndroidNativeBridge {
    * instances. See src/lib/widget.ts and WidgetSnapshot.kt.
    */
   setWidgetSnapshot: (json: string) => void;
+  /**
+   * Launches the system speech-recognizer dialog (RecognizerIntent); the
+   * transcript (or cancellation/error) comes back through
+   * window.androidVoiceResult, not a return value — same async-picker shape
+   * as exportBackup/importBackup. See src/lib/voiceReminder.ts.
+   */
+  startVoiceCapture: () => void;
 }
 
 declare global {

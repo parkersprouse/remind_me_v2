@@ -29,6 +29,7 @@ private const val REQUEST_ROW_TEMPLATE = 5001
 private const val REQUEST_OPEN_LIST = 5002
 private const val REQUEST_NEW_REMINDER = 5003
 private const val REQUEST_REFRESH = 5004
+private const val REQUEST_VOICE_REMINDER = 5005
 
 /**
  * Header refresh button, opposite the "+". Not declared in an intent filter —
@@ -222,6 +223,12 @@ class ReminderListWidgetProvider : AppWidgetProvider() {
         R.id.widget_refresh,
         "setColorFilter",
       ) { it.primary }
+      views.setSnapshotColor(
+        context,
+        snapshot,
+        R.id.widget_mic,
+        "setColorFilter",
+      ) { it.primary }
 
       // One empty view, two truths. "No reminders scheduled" would be a claim
       // about data that has never been read on an install whose widget was
@@ -272,6 +279,7 @@ class ReminderListWidgetProvider : AppWidgetProvider() {
       views.setOnClickPendingIntent(R.id.widget_empty, openList(context))
       views.setOnClickPendingIntent(R.id.widget_new_reminder, newReminder(context))
       views.setOnClickPendingIntent(R.id.widget_refresh, refreshIntent(context))
+      views.setOnClickPendingIntent(R.id.widget_mic, voiceReminder(context))
       return views
     }
 
@@ -328,6 +336,22 @@ class ReminderListWidgetProvider : AppWidgetProvider() {
       return PendingIntent.getBroadcast(
         context,
         REQUEST_REFRESH,
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+      )
+    }
+
+    /**
+     * The mic button, next to the "+": launches VoiceQuickCreateActivity —
+     * not MainActivity, unlike every other PendingIntent here — so a tap
+     * never visibly opens the app. See that class for the rest of the flow.
+     */
+    private fun voiceReminder(context: Context): PendingIntent {
+      val intent = Intent(context, VoiceQuickCreateActivity::class.java)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      return PendingIntent.getActivity(
+        context,
+        REQUEST_VOICE_REMINDER,
         intent,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
       )

@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.speech.RecognizerIntent
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
@@ -66,10 +67,12 @@ private data class CreateRequest(
     get() = !details.isNullOrBlank()
 }
 
-// Arbitrary but distinctive request codes for the backup document pickers;
-// results for codes we don't own fall through to super (Tauri plugins).
+// Arbitrary but distinctive request codes for the backup document pickers and
+// the voice-capture recognizer; results for codes we don't own fall through
+// to super (Tauri plugins).
 private const val REQUEST_EXPORT_BACKUP = 41001
 private const val REQUEST_IMPORT_BACKUP = 41002
+private const val REQUEST_VOICE_CAPTURE = 41003
 
 class MainActivity : TauriActivity() {
   private var webView: WebView? = null
@@ -274,6 +277,37 @@ class MainActivity : TauriActivity() {
     }
 
     /**
+     * Voice-driven reminder creation: launches the system speech recognizer;
+     * the transcript (or cancellation/error) is delivered to the frontend via
+     * window.androidVoiceResult, same as the backup pickers above and for the
+     * same reason (no retry polling needed — this is only ever called from a
+     * live webview). No RECORD_AUDIO permission needed: the resolved
+     * recognizer activity (the Google app) does the actual recording, not
+     * this app's process. And since this starts the activity directly and
+     * catches the failure rather than calling resolveActivity() /
+     * queryIntentActivities() first, API 30+ package-visibility filtering
+     * doesn't apply either — don't "fix" this by adding a manifest <queries>
+     * entry or a RECORD_AUDIO permission, neither is needed.
+     */
+    @JavascriptInterface
+    fun startVoiceCapture() {
+      runOnUiThread {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+          .putExtra(
+            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+          )
+          .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+          .putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.voice_reminder_prompt))
+        try {
+          startActivityForResult(intent, REQUEST_VOICE_CAPTURE)
+        } catch (_: Exception) {
+          deliverVoiceResult("voice-error", "no speech recognizer available")
+        }
+      }
+    }
+
+    /**
      * Hands over (and clears) the reminder bookkeeping the receivers performed
      * while no webview was around to update reminders.db. Returns a JSON array
      * string; unlike the backup methods this is synchronous, since
@@ -375,6 +409,16 @@ class MainActivity : TauriActivity() {
           deliverBackupResult("import-error", e.message ?: "read failed")
         }
       }
+      REQUEST_VOICE_CAPTURE -> {
+        val transcript = data
+          ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+          ?.firstOrNull()
+        if (resultCode != RESULT_OK || transcript.isNullOrBlank()) {
+          deliverVoiceResult("voice-cancelled", "")
+        } else {
+          deliverVoiceResult("voice-result", transcript)
+        }
+      }
     }
   }
 
@@ -386,6 +430,14 @@ class MainActivity : TauriActivity() {
   private fun deliverBackupResult(event: String, payload: String) {
     val js =
       "window.androidBackupResult && window.androidBackupResult(" +
+        "${JSONObject.quote(event)}, ${JSONObject.quote(payload)})"
+    runOnUiThread { webView?.evaluateJavascript(js, null) }
+  }
+
+  /** Hand a voice-capture outcome to the frontend — see deliverBackupResult. */
+  private fun deliverVoiceResult(event: String, payload: String) {
+    val js =
+      "window.androidVoiceResult && window.androidVoiceResult(" +
         "${JSONObject.quote(event)}, ${JSONObject.quote(payload)})"
     runOnUiThread { webView?.evaluateJavascript(js, null) }
   }

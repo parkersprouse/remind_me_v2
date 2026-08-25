@@ -158,7 +158,12 @@ async function handleCreateRequest(request: RawCreateRequest): Promise<void> {
   };
 }
 
-function normalizeDetails(raw: string | null): string | null {
+/**
+ * Trims, blank-checks, and caps details text to DetailsInput.vue's limit.
+ * Exported so other untrusted-text entry points (see src/lib/voiceReminder.ts)
+ * share this instead of a third copy alongside the Kotlin mirror.
+ */
+export function normalizeDetails(raw: string | null): string | null {
   if (raw === null) return null;
   const trimmed = raw.trim();
   if (trimmed === '') return null;

@@ -76,6 +76,27 @@
             </intent-filter>
         </activity>
 
+        <!-- Voice-driven reminder creation, headless path (PLAN.md follow-up):
+             the reminder-list widget's mic button launches this instead of
+             MainActivity, so a tap never visibly opens the app.
+             Theme.VoiceTrampoline (see themes.xml) means nothing is ever
+             drawn; see VoiceQuickCreateActivity.kt for the recognizer ->
+             parse -> CreateReminderReceiver flow.
+
+             Not exported: reached only via an explicit PendingIntent built by
+             this app itself (ReminderListWidgetProvider.voiceReminder), same
+             as MainActivity's own widget-triggered PendingIntents — a
+             PendingIntent runs with its creating app's identity regardless of
+             which process calls send() on it (the launcher, here), so this
+             does not need the launcher-facing exported=true a widget's own
+             <receiver> does. -->
+        <activity
+            android:name=".VoiceQuickCreateActivity"
+            android:theme="@style/Theme.VoiceTrampoline"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:exported="false" />
+
         <!-- Preset snooze buttons are registered with `foreground: false`, so
              the notification plugin sends their taps here as a package-scoped
              broadcast instead of launching MainActivity. Without this

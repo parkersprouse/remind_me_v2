@@ -3,4 +3,22 @@
     <style name="Theme.remind_me" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
     </style>
+
+    <!-- VoiceQuickCreateActivity's theme: hand-rolled rather than the
+         framework's @android:style/Theme.Translucent.NoDisplay alias, which
+         AAPT2 fails to resolve against this project's compileSdk (36) —
+         "resource android:style/Theme.Translucent.NoDisplay not found" at
+         link time, even though the runtime style still exists on-device.
+         These attributes are that style's actual effect: nothing is ever
+         drawn, so the activity is invisible for its whole (very short)
+         lifetime. -->
+    <style name="Theme.VoiceTrampoline" parent="android:Theme">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
 </resources>
