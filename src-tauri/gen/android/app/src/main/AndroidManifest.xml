@@ -94,7 +94,6 @@
             android:name=".VoiceQuickCreateActivity"
             android:theme="@style/Theme.VoiceTrampoline"
             android:excludeFromRecents="true"
-            android:noHistory="true"
             android:exported="false" />
 
         <!-- Preset snooze buttons are registered with `foreground: false`, so
