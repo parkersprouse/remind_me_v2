@@ -25,7 +25,7 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@fortawesome/fontawesome-free": "^7.3.0",
+    "@fortawesome/fontawesome-free": "^7.3.1",
     "@material/material-color-utilities": "^0.4.0",
     "@saurl/tauri-plugin-safe-area-insets-css-api": "^0.1.0",
     "@tauri-apps/api": "^2",

@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@fortawesome/fontawesome-free':
-        specifier: ^7.3.0
-        version: 7.3.0
+        specifier: ^7.3.1
+        version: 7.3.1
       '@material/material-color-utilities':
         specifier: ^0.4.0
         version: 0.4.0
@@ -326,8 +326,8 @@ packages:
     resolution: {integrity: sha512-+CNAzxglkrpNf/kKywqQfk74QjtceuOE7Qm+AF8miRvPF/wmmK5+OJOgVh3AVTT3RP2mH3+FOaxlE5v72owk0A==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
-  '@fortawesome/fontawesome-free@7.3.0':
-    resolution: {integrity: sha512-Yw4Qa43P6e4Xwh0TwEUkHQNRJInWaqIBo73VJmns3j2AIlZPAvUcR4yGIxCPqPRCgyJ5KIVIalF/I1GxhZ/Kgw==}
+  '@fortawesome/fontawesome-free@7.3.1':
+    resolution: {integrity: sha512-wmglKKPDIkgV3aWlZzWECCPoGIkYCulzBwxG9+w7rc5BGapZ6cPMpoPOT8k36J0Ni7PPX6c/rsoMWfS4d1MUMg==}
     engines: {node: '>=6'}
 
   '@humanfs/core@0.19.2':
@@ -827,11 +827,6 @@ packages:
 
   '@volar/typescript@2.4.15':
     resolution: {integrity: sha512-2aZ8i0cqPGjXb4BhkMsPYDkkuc2ZQ6yOpqwAuNwUoncELqoy5fRgOQtLR9gB0g902iS0NAkvpIzs27geVyVdPg==}
-    peerDependencies:
-      typescript: '*'
-    peerDependenciesMeta:
-      typescript:
-        optional: true
 
   '@vue/compiler-core@3.5.39':
     resolution: {integrity: sha512-16KBTEXAJCpDr0mwlw+AZyhu8iyC7R3S2vBwsI7QnWJU6X3WKc9VKeNEZpiMdZ569qWhz9574L3vV55qRL0Vtw==}
@@ -2317,7 +2312,7 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@fortawesome/fontawesome-free@7.3.0': {}
+  '@fortawesome/fontawesome-free@7.3.1': {}
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -2703,13 +2698,11 @@ snapshots:
 
   '@volar/source-map@2.4.15': {}
 
-  '@volar/typescript@2.4.15(typescript@5.6.3)':
+  '@volar/typescript@2.4.15':
     dependencies:
       '@volar/language-core': 2.4.15
       path-browserify: 1.0.1
       vscode-uri: 3.1.0
-    optionalDependencies:
-      typescript: 5.6.3
 
   '@vue/compiler-core@3.5.39':
     dependencies:
@@ -4258,7 +4251,7 @@ snapshots:
 
   vue-tsc@2.2.12(typescript@5.6.3):
     dependencies:
-      '@volar/typescript': 2.4.15(typescript@5.6.3)
+      '@volar/typescript': 2.4.15
       '@vue/language-core': 2.2.12(typescript@5.6.3)
       typescript: 5.6.3
 
