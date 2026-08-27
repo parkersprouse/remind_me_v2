@@ -9,6 +9,7 @@ import App from '@/App.vue';
 import { registerAndroidBackHandler } from '~lib/androidBack.ts';
 import { registerCreateRequestBridge } from '~lib/createRequest.ts';
 import { notification_manager } from '~lib/notifications.ts';
+import { syncVoiceWidgetAutoCreate } from '~lib/voiceReminder.ts';
 import { initWidgetSnapshot } from '~lib/widget.ts';
 import { useSettingsStore } from '~stores/settings.ts';
 
@@ -25,6 +26,9 @@ registerAndroidBackHandler();
 
 void (async () => {
   await useSettingsStore().load();
+  // Needs settings loaded; doesn't need notifications, so it can run
+  // alongside init() below rather than waiting on it.
+  syncVoiceWidgetAutoCreate();
   await notification_manager.init();
   // Needs settings (for scheduling) and notifications (for the channel)
   // ready before a fully-specified deep link is allowed to auto-create.

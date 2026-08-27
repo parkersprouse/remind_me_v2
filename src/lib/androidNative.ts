@@ -43,6 +43,13 @@ export interface AndroidNativeBridge {
    * as exportBackup/importBackup. See src/lib/voiceReminder.ts.
    */
   startVoiceCapture: () => void;
+  /**
+   * Mirrors the Settings > Voice Reminders > "Auto-create from widget voice"
+   * setting, so VoiceQuickCreateActivity.kt can read it without a live
+   * webview — same reasoning and pattern as setNotificationActionGroup. See
+   * VoiceWidgetSettings.kt.
+   */
+  setVoiceWidgetAutoCreate: (autoCreate: boolean) => void;
 }
 
 declare global {

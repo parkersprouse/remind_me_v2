@@ -174,6 +174,13 @@ function submit(): void {
  * produce a usable reminder gets an error toast so the user knows to retry or
  * type it themselves, per the reason chrono-node runs in this app and not in
  * the widget's headless Kotlin path.
+ *
+ * Settings > Voice Reminders > "Auto-create from in-app voice" schedules the
+ * parsed reminder immediately instead of leaving it for the user to review
+ * and tap Schedule — but only when a time was actually recognized: without
+ * one, submit() would schedule against whatever date/time the form already
+ * had (usually "now"), which is not what the user asked for, so it always
+ * falls back to prefill-and-wait in that case regardless of the setting.
  */
 async function captureVoice(): Promise<void> {
   listening.value = true;
@@ -181,6 +188,7 @@ async function captureVoice(): Promise<void> {
     const result = await captureSpokenReminder();
     if (result.status === 'ok') {
       prefill(result.details, result.dateTime);
+      if (settings.voiceInAppAutoCreate && result.dateTime !== undefined) submit();
     } else if (result.status !== 'cancelled') {
       toaster.show('Couldn’t Understand That', ERROR_TOAST);
     }

@@ -23,7 +23,13 @@ const DETAILS_MAX_LENGTH = 240;
 interface RawCreateRequest {
   details: string | null;
   atMillis: number | null;
-  source: 'deeplink' | 'share';
+  /**
+   * 'voice' is the widget's mic button with auto-create turned off in
+   * Settings (VoiceQuickCreateActivity.kt) — like 'share', it always falls
+   * through to prefill below regardless of how complete the request is; the
+   * user already chose to review before creating.
+   */
+  source: 'deeplink' | 'share' | 'voice';
   /**
    * Which surface the request is asking for: the New Reminder form
    * (`remindme://create`, a share, the launcher shortcut) or the reminder
@@ -86,7 +92,10 @@ export function registerCreateRequestBridge(): void {
  * reminder), while a fully-specified deep link — details plus a still-future
  * time — schedules outright. Anything short of that (missing time, missing
  * notification permission, or a schedule failure) falls back to prefilling
- * the New Reminder form instead of silently dropping the request.
+ * the New Reminder form instead of silently dropping the request. A 'voice'
+ * request (the widget's mic button with Settings' "Auto-create from widget
+ * voice" off) is treated like a share regardless of completeness — the user
+ * already asked to review it, so it always prefills too.
  */
 async function handleCreateRequest(request: RawCreateRequest): Promise<void> {
   const details = normalizeDetails(request.details);

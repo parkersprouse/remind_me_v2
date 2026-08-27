@@ -27,17 +27,22 @@ private val TIME_FORMAT = SimpleDateFormat("h:mm a", Locale.US)
 /**
  * Trampoline for the reminder-list widget's mic button (PLAN.md follow-up):
  * a dedicated, invisible Activity — not MainActivity — so tapping the mic
- * never visibly opens the app. `Theme.Translucent.NoDisplay` in the manifest
- * means nothing is ever drawn; onCreate launches the system speech
+ * never visibly opens the app *when auto-create is on* (Settings > Voice
+ * Reminders > "Auto-create from widget voice", the default — see
+ * VoiceWidgetSettings). `Theme.Translucent.NoDisplay` in the manifest means
+ * nothing is ever drawn here regardless; onCreate launches the system speech
  * recognizer immediately and every other path finishes without ever calling
  * setContentView.
  *
  * Unlike QuickCreateWidgetProvider's preset buttons, whose fire-and-forget
  * broadcast can't fail validation by construction, a voice transcript
- * genuinely can fail to parse or to schedule — so this sends an *ordered*
- * broadcast to CreateReminderReceiver and reads back its actual result code
- * rather than guessing, since accurate feedback (there is no screen open to
- * notice a wrong guess on) is the whole point of this button existing.
+ * genuinely can fail to parse or to schedule — so auto-create sends an
+ * *ordered* broadcast to CreateReminderReceiver and reads back its actual
+ * result code rather than guessing, since accurate feedback (there is no
+ * screen open to notice a wrong guess on) is the whole point of this button
+ * existing. With auto-create off, that concern doesn't apply — the app opens
+ * to a filled-in, reviewable form instead, so openPrefill() has no result to
+ * report and nothing to guess at.
  */
 class VoiceQuickCreateActivity : Activity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,7 +83,25 @@ class VoiceQuickCreateActivity : Activity() {
       return
     }
 
-    createReminder(parsed)
+    if (VoiceWidgetSettings.autoCreate(this)) createReminder(parsed) else openPrefill(parsed)
+  }
+
+  /**
+   * Auto-create off: hand the parse off to MainActivity instead of
+   * CreateReminderReceiver, the same way a share intent does (see
+   * ACTION_VOICE_PREFILL in MainActivity.kt and "voice" handling in
+   * src/lib/createRequest.ts) — the app opens to the New Reminder form,
+   * prefilled, for the user to review and submit themselves. No toast: the
+   * form itself is the feedback.
+   */
+  private fun openPrefill(parsed: ParsedReminder) {
+    val intent = Intent(this, MainActivity::class.java)
+      .setAction(ACTION_VOICE_PREFILL)
+      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      .putExtra(EXTRA_DETAILS, parsed.details)
+      .putExtra(EXTRA_FIRE_AT, parsed.fireAtMillis)
+    startActivity(intent)
+    finish()
   }
 
   private fun createReminder(parsed: ParsedReminder) {

@@ -97,6 +97,45 @@
     <section class='settings-container'>
       <div class='backup-header'>
         <span class='section-title'>
+          <BadgedIcon icon='fa-solid fa-bell' badge='fa-solid fa-microphone' :size='17' class='section-icon' />
+          Voice Reminders
+        </span>
+      </div>
+      <p class='backup-hint'>
+        Choose whether a recognized voice reminder is scheduled right away, or just fills in the New
+        Reminder form for you to review first.
+      </p>
+      <div class='sub-option'>
+        <LabeledSwitch
+          :model-value='settings.voiceInAppAutoCreate'
+          @update:modelValue='settings.setVoiceInAppAutoCreate($event)'
+        >
+          <span class='sub-title'>
+            <i class='fa-solid fa-comment-dots sub-icon' aria-hidden='true' />
+            Auto-create from in-app voice
+          </span>
+        </LabeledSwitch>
+      </div>
+      <div class='sub-option'>
+        <LabeledSwitch
+          :model-value='settings.voiceWidgetAutoCreate'
+          @update:modelValue='settings.setVoiceWidgetAutoCreate($event)'
+        >
+          <span class='sub-title'>
+            <i class='fa-solid fa-table-cells sub-icon' aria-hidden='true' />
+            Auto-create from widget voice
+          </span>
+        </LabeledSwitch>
+      </div>
+      <p class='backup-hint'>
+        When widget voice creation doesn't auto-create, it opens the app to the New Reminder form
+        instead — there's no way to show a form directly from the home screen.
+      </p>
+    </section>
+
+    <section class='settings-container'>
+      <div class='backup-header'>
+        <span class='section-title'>
           <BadgedIcon icon='fa-solid fa-bell' badge='fa-solid fa-floppy-disk' :size='17' class='section-icon' />
           Backup
         </span>

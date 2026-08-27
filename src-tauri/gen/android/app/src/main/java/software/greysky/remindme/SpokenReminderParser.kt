@@ -22,16 +22,22 @@ data class ParsedReminder(val details: String, val fireAtMillis: Long)
  * Gradle dependency to this hand-edited tree specifically to dodge R8 risk
  * (see CLAUDE.md — Jetpack Glance was rejected for the same reason).
  *
- * Understands exactly two shapes, matching what the user actually asked for:
+ * Understands three shapes, matching what the user actually asked for:
  *   "in <number> <minute(s)/hour(s)/day(s)/week(s)>"
  *   "on <Month> <Day>[, <Year>]" / "today" / "tomorrow", optionally
- *     followed by "at <hour>[:<minute>] am/pm"
+ *     followed by "at <hour>[:<minute>] [am/pm]"
+ *   "at <hour>[:<minute>] [am/pm]" on its own, with no date word at all
  *
- * A clock time missing am/pm is treated as unparseable rather than guessed at
- * (a silent wrong guess is worse here than nowhere to see it was wrong, since
- * there's no screen open to notice on). An absolute date with no time at all
- * defaults to 9:00 AM — that's a documented fallback for a genuinely absent
- * value, not a guess about intent, unlike an ambiguous hour.
+ * A clock time missing am/pm resolves to whichever of the two 12-hour
+ * readings is the next one to occur from `now` — "at 4:00" said at 3:30 PM
+ * means 4:00 PM today, not 4:00 AM tomorrow — matching the same override the
+ * in-app parser applies to chrono-node's own (different, and here judged
+ * wrong) default guess for the identical phrasing; see resolveAmbiguousTime
+ * and voiceReminder.ts's resolveAmbiguousMeridiem. An absolute date with no
+ * time at all defaults to 9:00 AM, and a bare time with no date at all
+ * defaults to today — both roll forward (year, respectively day) when the
+ * resolved moment has already passed, mirroring chrono-node's forwardDate
+ * option.
  *
  * Anything this can't parse fails with null, and VoiceQuickCreateActivity
  * tells the user to open the app instead.
@@ -67,14 +73,12 @@ object SpokenReminderParser {
     RegexOption.IGNORE_CASE,
   )
   private val TODAY_TOMORROW = Regex("""\b(today|tomorrow)\b""", RegexOption.IGNORE_CASE)
+  // The am/pm group is optional — see resolveTime for how an absent one is
+  // read.
   private val TIME_OF_DAY = Regex(
-    """\bat\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b""",
+    """\bat\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\b""",
     RegexOption.IGNORE_CASE,
   )
-  // A clock time with no am/pm: still matched so its presence can be treated
-  // as "ambiguous, reject" rather than silently falling through and being
-  // read as details text.
-  private val AMBIGUOUS_TIME_OF_DAY = Regex("""\bat\s+\d{1,2}(?::\d{2})?\b""", RegexOption.IGNORE_CASE)
 
   private val FILLER_PREFIX =
     Regex("""^(please\s+)?(set|create)\s+(up\s+)?(a|an)\s+reminder\s*""", RegexOption.IGNORE_CASE)
@@ -101,21 +105,28 @@ object SpokenReminderParser {
       return ParsedReminder(details, fireAt)
     }
 
-    val absoluteMatch = ABSOLUTE_DATE.find(clean) ?: TODAY_TOMORROW.find(clean)
-    if (absoluteMatch == null) return null
-    // An ambiguous hour ("at 3", no am/pm) is only worth rejecting outright if
-    // there's otherwise a valid date to attach it to — that's the case this
-    // parser can get partly right and get wrong silently.
     val timeMatch = TIME_OF_DAY.find(clean)
-    if (timeMatch == null && AMBIGUOUS_TIME_OF_DAY.containsMatchIn(clean)) return null
 
-    val date = resolveDate(absoluteMatch, now, zone) ?: return null
-    val time = timeMatch?.let(::resolveTime) ?: LocalTime.of(9, 0)
-    val fireAt = LocalDateTime.of(date, time).atZone(zone).toInstant().toEpochMilli()
+    val absoluteMatch = ABSOLUTE_DATE.find(clean) ?: TODAY_TOMORROW.find(clean)
+    if (absoluteMatch != null) {
+      val date = resolveDate(absoluteMatch, now, zone) ?: return null
+      val fireAt = resolveDateTime(date, timeMatch, now, zone) ?: return null
+      val consumed = listOfNotNull(absoluteMatch.range, timeMatch?.range)
+      val details = extractDetails(clean, consumed) ?: return null
+      return ParsedReminder(details, fireAt)
+    }
 
-    val consumed = listOfNotNull(absoluteMatch.range, timeMatch?.range)
-    val details = extractDetails(clean, consumed) ?: return null
-    return ParsedReminder(details, fireAt)
+    // No date word at all ("remind me at 4:00 to order dinner"): default to
+    // today — resolveDateTime rolls forward on its own if the resolved
+    // moment has already passed.
+    if (timeMatch != null) {
+      val today = LocalDate.ofInstant(java.time.Instant.ofEpochMilli(now), zone)
+      val fireAt = resolveDateTime(today, timeMatch, now, zone) ?: return null
+      val details = extractDetails(clean, listOf(timeMatch.range)) ?: return null
+      return ParsedReminder(details, fireAt)
+    }
+
+    return null
   }
 
   private fun resolveDate(match: MatchResult, now: Long, zone: ZoneId): LocalDate? {
@@ -140,14 +151,64 @@ object SpokenReminderParser {
     return if (explicitYear == null && candidate.isBefore(today)) candidate.plusYears(1) else candidate
   }
 
-  private fun resolveTime(match: MatchResult): LocalTime? {
-    var hour = match.groupValues[1].toIntOrNull() ?: return null
-    val minute = match.groupValues[2].ifEmpty { "0" }.toIntOrNull() ?: return null
-    val isPm = match.groupValues[3].startsWith("p", ignoreCase = true)
+  /**
+   * Combines a resolved calendar date with an optional matched time-of-day
+   * clause into an epoch. No time match at all defaults to 9:00 AM on that
+   * date; an explicit am/pm resolves the usual way. An ambiguous clock time
+   * (no am/pm) is handed to resolveAmbiguousTime instead of being read as a
+   * fixed hour, since which reading is correct depends on `now` — see that
+   * function and the class doc comment.
+   */
+  private fun resolveDateTime(date: LocalDate, timeMatch: MatchResult?, now: Long, zone: ZoneId): Long? {
+    if (timeMatch == null) {
+      return LocalDateTime.of(date, LocalTime.of(9, 0)).atZone(zone).toInstant().toEpochMilli()
+    }
+
+    var hour = timeMatch.groupValues[1].toIntOrNull() ?: return null
+    val minute = timeMatch.groupValues[2].ifEmpty { "0" }.toIntOrNull() ?: return null
+    val meridiem = timeMatch.groupValues[3]
     if (hour !in 1..12 || minute !in 0..59) return null
-    if (hour == 12) hour = 0
-    if (isPm) hour += 12
-    return LocalTime.of(hour, minute)
+
+    if (meridiem.isNotEmpty()) {
+      val isPm = meridiem.startsWith("p", ignoreCase = true)
+      if (hour == 12) hour = 0
+      if (isPm) hour += 12
+      return LocalDateTime.of(date, LocalTime.of(hour, minute)).atZone(zone).toInstant().toEpochMilli()
+    }
+
+    return resolveAmbiguousTime(date, hour, minute, now, zone)
+  }
+
+  /**
+   * "at 4:00" with no am/pm resolves to whichever of the two 12-hour readings
+   * is the *next one to occur* from `now` — not a fixed AM/PM guess. AM
+   * always precedes PM on the same calendar day, so in chronological order
+   * the only candidates that can possibly be "next" are: `date`'s AM
+   * reading, `date`'s PM reading, then the following day's AM reading (which
+   * is always still in the future once both of `date`'s have passed, so
+   * nothing later ever needs checking). The first candidate at or after
+   * `now` wins.
+   *
+   * For an explicit future `date` (e.g. "on September 1st"), every candidate
+   * is already ≥ `now`, so this simply picks the AM reading — the same
+   * result the previous fixed-AM behavior gave, so this is a pure
+   * generalization of it, not a regression for that case.
+   *
+   * Note hour 12 has two same-day readings too (00:00 then 12:00), so a
+   * bare "at 12:00" late in the day can resolve to the *next calendar day's
+   * midnight* rather than the more colloquial "noon" — accepted, since it is
+   * still the literal nearest future occurrence of "12:00" and this function
+   * has no way to know "noon" was meant instead.
+   */
+  private fun resolveAmbiguousTime(date: LocalDate, hour: Int, minute: Int, now: Long, zone: ZoneId): Long {
+    val amHour = if (hour == 12) 0 else hour
+    val pmHour = if (hour == 12) 12 else hour + 12
+    val candidates = listOf(
+      LocalDateTime.of(date, LocalTime.of(amHour, minute)),
+      LocalDateTime.of(date, LocalTime.of(pmHour, minute)),
+      LocalDateTime.of(date.plusDays(1), LocalTime.of(amHour, minute)),
+    ).map { it.atZone(zone).toInstant().toEpochMilli() }
+    return candidates.firstOrNull { it >= now } ?: candidates.last()
   }
 
   /**

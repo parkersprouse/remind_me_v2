@@ -24,9 +24,22 @@ import org.json.JSONObject
 private const val HANDLED_ACTION_KEY = "handledNotificationAction"
 
 /**
- * A `remindme://` deep link or ACTION_SEND share-text hand-off, parsed from
- * the launching intent (PLAN.md, phase 1; the `reminders` host is phases 5
- * and 6).
+ * Internal-only action VoiceQuickCreateActivity uses to hand a parsed voice
+ * transcript to MainActivity when Settings' "Auto-create from widget voice"
+ * is off — an explicit component Intent, never a public deep link, since
+ * unlike remindme://create this isn't part of the documented automation
+ * surface (README.md#automation) and has no business being reachable from
+ * outside the app. Reuses CreateReminderReceiver's EXTRA_DETAILS/EXTRA_FIRE_AT
+ * constants rather than duplicating them. Not private: VoiceQuickCreateActivity
+ * needs it too, and top-level `private` in Kotlin is file-scoped, not
+ * package-scoped (same reason ACTION_CREATE_REMINDER isn't private).
+ */
+const val ACTION_VOICE_PREFILL = "software.greysky.remindme.VOICE_PREFILL"
+
+/**
+ * A `remindme://` deep link, ACTION_SEND share-text hand-off, or the widget's
+ * voice-prefill request (ACTION_VOICE_PREFILL), parsed from the launching
+ * intent (PLAN.md, phase 1; the `reminders` host is phases 5 and 6).
  * `replayKey` is what makes the request idempotent across a replayed intent
  * (see fingerprint()) — the full URI for a deep link (a caller-supplied `key`
  * query param just rides along as part of it), or the shared text itself for
@@ -328,6 +341,18 @@ class MainActivity : TauriActivity() {
     }
 
     /**
+     * Mirrors Settings > Voice Reminders > "Auto-create from widget voice" so
+     * VoiceQuickCreateActivity can read it without a live webview (see
+     * VoiceWidgetSettings and syncVoiceWidgetAutoCreate in
+     * src/lib/voiceReminder.ts) — same reasoning as
+     * setNotificationActionGroup above.
+     */
+    @JavascriptInterface
+    fun setVoiceWidgetAutoCreate(autoCreate: Boolean) {
+      VoiceWidgetSettings.setAutoCreate(this@MainActivity, autoCreate)
+    }
+
+    /**
      * Hands the reminder-list widget its snapshot — formatted rows plus both
      * color schemes — and repaints any placed instances (PLAN.md, phase 5;
      * see WidgetSnapshot and src/lib/widget.ts). Synchronous like
@@ -493,6 +518,16 @@ class MainActivity : TauriActivity() {
         if (intent.type != "text/plain") return null
         val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return null
         CreateRequest(text, null, "share", "share:$text", "new")
+      }
+      // VoiceQuickCreateActivity's auto-create-off path: always prefills on
+      // the frontend (src/lib/createRequest.ts treats "voice" like "share"),
+      // regardless of how complete the parse was — the user already chose to
+      // review before creating, by turning the setting off.
+      ACTION_VOICE_PREFILL -> {
+        val details = intent.getStringExtra(EXTRA_DETAILS) ?: return null
+        val atMillis = intent.getLongExtra(EXTRA_FIRE_AT, Long.MIN_VALUE)
+          .takeIf { it != Long.MIN_VALUE }
+        CreateRequest(details, atMillis, "voice", "voice:$details|$atMillis", "new")
       }
       else -> null
     }

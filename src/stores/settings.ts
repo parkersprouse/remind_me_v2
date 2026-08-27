@@ -31,6 +31,14 @@ const defaults = {
   // Absolute ("Apr 4, 2026, 12:50 PM") by default — matches existing
   // behavior for everyone upgrading into this setting.
   showRelativeTime: false,
+  // Whether a successful voice parse schedules the reminder outright instead
+  // of just filling the New Reminder form for the user to review and submit.
+  // In-app defaults to off (fill the form — today's only behavior); the
+  // widget defaults to on (auto-create — today's only behavior there, and the
+  // only way it worked before this setting existed, since a widget's mic tap
+  // has no screen to show a filled-in form on unless it opens the app).
+  voiceInAppAutoCreate: false,
+  voiceWidgetAutoCreate: true,
 };
 
 // Persistence goes through tauri-plugin-store (settings.json), the moral
@@ -50,6 +58,8 @@ export const useSettingsStore = defineStore('settings', {
     notifSnoozeOptions: defaults.notifSnoozeOptions,
     notifSnoozeCustomButton: defaults.notifSnoozeCustomButton,
     showRelativeTime: defaults.showRelativeTime,
+    voiceInAppAutoCreate: defaults.voiceInAppAutoCreate,
+    voiceWidgetAutoCreate: defaults.voiceWidgetAutoCreate,
     systemPrefersDark: system_dark_query.matches,
   }),
 
@@ -95,6 +105,10 @@ export const useSettingsStore = defineStore('settings', {
         defaults.notifSnoozeCustomButton;
       this.showRelativeTime =
         (await persisted.get<boolean>('show_relative_time')) ?? defaults.showRelativeTime;
+      this.voiceInAppAutoCreate =
+        (await persisted.get<boolean>('voice_in_app_auto_create')) ?? defaults.voiceInAppAutoCreate;
+      this.voiceWidgetAutoCreate =
+        (await persisted.get<boolean>('voice_widget_auto_create')) ?? defaults.voiceWidgetAutoCreate;
 
       system_dark_query.addEventListener('change', (event) => {
         this.systemPrefersDark = event.matches;
@@ -139,6 +153,16 @@ export const useSettingsStore = defineStore('settings', {
     setShowRelativeTime(enabled: boolean) {
       this.showRelativeTime = enabled;
       void persisted.set('show_relative_time', enabled);
+    },
+
+    setVoiceInAppAutoCreate(enabled: boolean) {
+      this.voiceInAppAutoCreate = enabled;
+      void persisted.set('voice_in_app_auto_create', enabled);
+    },
+
+    setVoiceWidgetAutoCreate(enabled: boolean) {
+      this.voiceWidgetAutoCreate = enabled;
+      void persisted.set('voice_widget_auto_create', enabled);
     },
   },
 });
