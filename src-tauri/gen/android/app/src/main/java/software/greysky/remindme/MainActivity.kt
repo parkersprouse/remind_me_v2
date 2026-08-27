@@ -17,6 +17,8 @@ import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import java.time.Instant
 import org.json.JSONObject
@@ -79,13 +81,6 @@ private data class CreateRequest(
   val isCreate: Boolean
     get() = !details.isNullOrBlank()
 }
-
-// Arbitrary but distinctive request codes for the backup document pickers and
-// the voice-capture recognizer; results for codes we don't own fall through
-// to super (Tauri plugins).
-private const val REQUEST_EXPORT_BACKUP = 41001
-private const val REQUEST_IMPORT_BACKUP = 41002
-private const val REQUEST_VOICE_CAPTURE = 41003
 
 class MainActivity : TauriActivity() {
   private var webView: WebView? = null
@@ -244,8 +239,9 @@ class MainActivity : TauriActivity() {
      * Export flow: stash the backup JSON and let the user pick a destination
      * with the system "create document" dialog (Storage Access Framework, so
      * no storage permission is needed — the grant covers just the chosen
-     * file). The write happens in onActivityResult; the outcome is reported
-     * to the frontend via window.androidBackupResult (see src/lib/backup.ts).
+     * file). The write happens in exportBackupLauncher's callback; the
+     * outcome is reported to the frontend via window.androidBackupResult
+     * (see src/lib/backup.ts).
      */
     @JavascriptInterface
     fun exportBackup(json: String, fileName: String) {
@@ -257,7 +253,7 @@ class MainActivity : TauriActivity() {
           .setType("application/json")
           .putExtra(Intent.EXTRA_TITLE, fileName)
         try {
-          startActivityForResult(intent, REQUEST_EXPORT_BACKUP)
+          exportBackupLauncher.launch(intent)
         } catch (_: Exception) {
           pendingExportJson = null
           deliverBackupResult("export-error", "no document picker available")
@@ -267,7 +263,7 @@ class MainActivity : TauriActivity() {
 
     /**
      * Import flow: system "open document" dialog; the file's text is handed
-     * to the frontend in onActivityResult. Providers don't reliably report
+     * to the frontend by importBackupLauncher. Providers don't reliably report
      * .json files as application/json (downloads often come back as
      * text/plain or octet-stream), hence the wildcard type + mime hint.
      */
@@ -282,7 +278,7 @@ class MainActivity : TauriActivity() {
             arrayOf("application/json", "text/plain", "application/octet-stream")
           )
         try {
-          startActivityForResult(intent, REQUEST_IMPORT_BACKUP)
+          importBackupLauncher.launch(intent)
         } catch (_: Exception) {
           deliverBackupResult("import-error", "no document picker available")
         }
@@ -313,7 +309,7 @@ class MainActivity : TauriActivity() {
           .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
           .putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.voice_reminder_prompt))
         try {
-          startActivityForResult(intent, REQUEST_VOICE_CAPTURE)
+          voiceCaptureLauncher.launch(intent)
         } catch (_: Exception) {
           deliverVoiceResult("voice-error", "no speech recognizer available")
         }
@@ -389,19 +385,26 @@ class MainActivity : TauriActivity() {
     }
   }
 
-  @Deprecated("Deprecated in Java")
-  override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-    @Suppress("DEPRECATION")
-    super.onActivityResult(requestCode, resultCode, data)
-    when (requestCode) {
-      REQUEST_EXPORT_BACKUP -> {
-        val json = pendingExportJson
-        pendingExportJson = null
-        val uri = data?.data
-        if (resultCode != RESULT_OK || uri == null || json == null) {
-          deliverBackupResult("export-cancelled", "")
-          return
-        }
+  /**
+   * Activity-result launchers for the two backup document pickers and the
+   * voice-capture recognizer, replacing the deprecated
+   * startActivityForResult/onActivityResult pair. Each launcher carries its
+   * own callback, so there are no request codes left to dispatch on.
+   *
+   * These have to be registered before the activity reaches STARTED, hence
+   * property initializers rather than lazy creation at call time — registering
+   * during construction is the documented ComponentActivity pattern. The
+   * callbacks run on the main thread, so they may touch webView directly
+   * (deliverBackupResult/deliverVoiceResult still post, harmlessly).
+   */
+  private val exportBackupLauncher: ActivityResultLauncher<Intent> =
+    registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+      val json = pendingExportJson
+      pendingExportJson = null
+      val uri = result.data?.data
+      if (result.resultCode != RESULT_OK || uri == null || json == null) {
+        deliverBackupResult("export-cancelled", "")
+      } else {
         try {
           // "wt" truncates when the user overwrites an existing file; some
           // providers only accept "w", which is equivalent for the fresh
@@ -418,12 +421,14 @@ class MainActivity : TauriActivity() {
           deliverBackupResult("export-error", e.message ?: "write failed")
         }
       }
-      REQUEST_IMPORT_BACKUP -> {
-        val uri = data?.data
-        if (resultCode != RESULT_OK || uri == null) {
-          deliverBackupResult("import-cancelled", "")
-          return
-        }
+    }
+
+  private val importBackupLauncher: ActivityResultLauncher<Intent> =
+    registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+      val uri = result.data?.data
+      if (result.resultCode != RESULT_OK || uri == null) {
+        deliverBackupResult("import-cancelled", "")
+      } else {
         try {
           val text = contentResolver.openInputStream(uri)
             ?.bufferedReader(Charsets.UTF_8)
@@ -434,18 +439,19 @@ class MainActivity : TauriActivity() {
           deliverBackupResult("import-error", e.message ?: "read failed")
         }
       }
-      REQUEST_VOICE_CAPTURE -> {
-        val transcript = data
-          ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-          ?.firstOrNull()
-        if (resultCode != RESULT_OK || transcript.isNullOrBlank()) {
-          deliverVoiceResult("voice-cancelled", "")
-        } else {
-          deliverVoiceResult("voice-result", transcript)
-        }
+    }
+
+  private val voiceCaptureLauncher: ActivityResultLauncher<Intent> =
+    registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+      val transcript = result.data
+        ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+        ?.firstOrNull()
+      if (result.resultCode != RESULT_OK || transcript.isNullOrBlank()) {
+        deliverVoiceResult("voice-cancelled", "")
+      } else {
+        deliverVoiceResult("voice-result", transcript)
       }
     }
-  }
 
   /**
    * Hand a backup picker outcome to the frontend. Unlike the notification

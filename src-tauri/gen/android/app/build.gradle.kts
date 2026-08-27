@@ -74,8 +74,19 @@ android {
             )
         }
     }
+    // Tauri's template ships Java/Kotlin 8 here; JDK 21 warns that source/target
+    // 8 is obsolete, and there is nothing holding this module back (minSdk 26,
+    // AGP 8.11, Kotlin 1.9.25). compileOptions and jvmTarget must be bumped
+    // together or AGP fails the build on the jvm-target mismatch. The other
+    // three Gradle modules (:tauri-android, :tauri-plugin-safe-area-insets-css
+    // and the vendored notification plugin) still compile at 8 — see the
+    // suppression flag in gradle.properties.
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
     buildFeatures {
         buildConfig = true
