@@ -42,7 +42,9 @@ private val TIME_FORMAT = SimpleDateFormat("h:mm a", Locale.US)
  * screen open to notice a wrong guess on) is the whole point of this button
  * existing. With auto-create off, that concern doesn't apply — the app opens
  * to a filled-in, reviewable form instead, so openPrefill() has no result to
- * report and nothing to guess at.
+ * report and nothing to guess at. A transcript with no usable time in it
+ * takes that same path whatever the setting says, since there is nothing to
+ * schedule yet.
  */
 class VoiceQuickCreateActivity : Activity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,7 +85,19 @@ class VoiceQuickCreateActivity : Activity() {
       return
     }
 
-    if (VoiceWidgetSettings.autoCreate(this)) createReminder(parsed) else openPrefill(parsed)
+    // A phrase with no usable time in it — none at all ("remind me to call
+    // mom"), or one that has already passed ("remind me today to ..." said
+    // after DEFAULT_HOUR) — can't be created headlessly, but it isn't a
+    // failure either. Same policy as an incomplete deep link (see
+    // src/lib/createRequest.ts, which also requires a *still-future* time
+    // before creating outright): fall back to the prefilled form rather than
+    // dropping what the user said.
+    val fireAt = parsed.fireAtMillis?.takeIf { it > System.currentTimeMillis() }
+    if (fireAt != null && VoiceWidgetSettings.autoCreate(this)) {
+      createReminder(parsed, fireAt)
+    } else {
+      openPrefill(parsed)
+    }
   }
 
   /**
@@ -99,22 +113,27 @@ class VoiceQuickCreateActivity : Activity() {
       .setAction(ACTION_VOICE_PREFILL)
       .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       .putExtra(EXTRA_DETAILS, parsed.details)
-      .putExtra(EXTRA_FIRE_AT, parsed.fireAtMillis)
+    // Left out entirely when the phrase named no time: MainActivity reads a
+    // missing extra as "no time given" and the form opens with just the
+    // details filled in. A time that has already passed rides along rather
+    // than being filtered here, since handleCreateRequest drops a
+    // non-future one anyway and prefills the details on their own.
+    parsed.fireAtMillis?.let { intent.putExtra(EXTRA_FIRE_AT, it) }
     startActivity(intent)
     finish()
   }
 
-  private fun createReminder(parsed: ParsedReminder) {
+  private fun createReminder(parsed: ParsedReminder, fireAtMillis: Long) {
     val intent = Intent(this, CreateReminderReceiver::class.java)
       .setAction(ACTION_CREATE_REMINDER)
       .putExtra(EXTRA_DETAILS, parsed.details)
-      .putExtra(EXTRA_FIRE_AT, parsed.fireAtMillis)
+      .putExtra(EXTRA_FIRE_AT, fireAtMillis)
     sendOrderedBroadcast(
       intent,
       null,
       object : BroadcastReceiver() {
         override fun onReceive(context: Context, result: Intent) {
-          toastAndFinish(messageFor(resultCode, parsed.fireAtMillis))
+          toastAndFinish(messageFor(resultCode, fireAtMillis))
         }
       },
       Handler(Looper.getMainLooper()),

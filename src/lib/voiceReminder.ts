@@ -4,7 +4,7 @@ import { watch } from 'vue';
 import { normalizeDetails } from '~lib/createRequest.ts';
 import { useSettingsStore } from '~stores/settings.ts';
 
-import type { ParsedComponents } from 'chrono-node';
+import type { ParsedComponents, ParsedResult } from 'chrono-node';
 import type { AndroidNativeBridge } from '~lib/androidNative.ts';
 
 /**
@@ -32,10 +32,47 @@ const REMIND_ME_PREFIX = /^(please\s+)?remind\s+me\s*/i;
 // the details rather than being part of them.
 const CONNECTOR_PREFIX = /^(for|to|that)\s+/i;
 // The preposition that introduces the time clause ("...reminder *on* August
-// 6th...", "...reminder *in* one hour...") sits immediately before whatever
+// 6th...", "...reminder *for* 1:00 p.m....") sits immediately before whatever
 // chrono.parse() matched, so it has to be stripped from the text preceding
-// the match rather than the (already-removed) match itself.
-const TRAILING_PREPOSITION = /\b(on|in|at)\s*$/i;
+// the match rather than the (already-removed) match itself — as does the
+// determiner trailing it ("...call mom *in the* morning") and one left
+// dangling on its own ("...remind me *the* 1st of September").
+const TRAILING_PREPOSITION = /\b((?:on|in|at|for|by|around)(?:\s+the)?|the)\s*$/i;
+// Punctuation stranded where the time clause used to be: chrono's match for
+// "...for 1:00 p.m. to call mom" stops before the sentence-ending period of
+// "p.m.", so cutting it out leaves ". to call mom" behind.
+const LEADING_PUNCTUATION = /^[\s,.;:!?]+/;
+const WHITESPACE_RUN = /\s+/g;
+
+/**
+ * Times of day chrono resolves to an hour of its own choosing rather than
+ * from digits the user spoke ("tonight", "tomorrow morning"). Those readings
+ * are chrono's to make — resolveAmbiguousMeridiem must not treat them as an
+ * ambiguous clock reading, and they count as the phrase having named a time,
+ * so DEFAULT_HOUR doesn't apply either.
+ */
+const CASUAL_TIME_WORD = /\b(noon|midday|midnight|morning|afternoon|evening|night|tonight)\b/i;
+/**
+ * A pure offset from now ("in 20 minutes", "3 days from now"). Such a phrase
+ * names no clock time but still resolves to an exact moment — the offset
+ * carries the current time of day with it — so DEFAULT_HOUR doesn't apply.
+ */
+const OFFSET_PHRASE = /^(in|within|after)\b|\bfrom (now|today)\b/i;
+/**
+ * chrono reads "a week from today" as just "a week", leaving the rest to the
+ * details, so the phrase has to be recognized from the text that follows the
+ * match as well as from the match itself.
+ */
+const OFFSET_SUFFIX = /^\s*from\s+(now|today)\b/i;
+/**
+ * Hour a phrase that named a day but no clock time fires at ("remind me
+ * tomorrow to call mom"). Left to itself chrono fills such a phrase in with
+ * noon, or with whatever time the user happened to be speaking at, neither of
+ * which is what a bare "tomorrow" means. Mirrors DEFAULT_HOUR in
+ * SpokenReminderParser.kt (the widget's dependency-free parser) — keep the
+ * two in sync.
+ */
+const DEFAULT_HOUR = 9;
 
 export type VoiceCaptureResult =
   | {
@@ -163,6 +200,75 @@ function resolveAmbiguousMeridiem(now: Date, comp: ParsedComponents): Date {
   return candidates.find((candidate) => candidate.getTime() >= now.getTime()) ?? candidates[candidates.length - 1];
 }
 
+/**
+ * Turns chrono's match into the moment the reminder should fire, applying the
+ * two policies the widget's parser mirrors (see SpokenReminderParser.kt):
+ * an ambiguous clock reading resolves to its next occurrence, and a phrase
+ * that named a day but no time fires at DEFAULT_HOUR.
+ *
+ * The overrides are deliberately narrow. chrono marks the hour *certain* only
+ * when the phrase actually stated one, and marks the meridiem certain when
+ * am/pm was spoken or the reading is unambiguous anyway ("17:30"), so an
+ * uncertain meridiem on a certain hour is exactly the "4:00 — but which one?"
+ * case. It has to be a digit reading in the 1-12 range on top of that: "at
+ * noon" also arrives as a certain hour with an uncertain meridiem, and
+ * treating 12 as its AM reading turned lunch into midnight, while an hour
+ * chrono derived from a word ("afternoon" -> 15) has no second reading to
+ * choose between at all.
+ */
+function resolveMatchedDateTime(now: Date, transcript: string, match: ParsedResult): Date {
+  const comp = match.start;
+  const hour = comp.get('hour') ?? 0;
+  const named_in_words = CASUAL_TIME_WORD.test(match.text);
+  if (comp.isCertain('hour')) {
+    const ambiguous = !comp.isCertain('meridiem') && hour >= 1 && hour <= 12 && !named_in_words;
+    return ambiguous ? resolveAmbiguousMeridiem(now, comp) : comp.date();
+  }
+
+  // No stated hour: either the phrase named a time in words, or it is an
+  // offset that carries the current time of day with it — both are chrono's
+  // reading to keep. Anything else named a day and nothing more.
+  if (named_in_words || isOffsetPhrase(transcript, match)) return comp.date();
+  const date = comp.date();
+  date.setHours(DEFAULT_HOUR, 0, 0, 0);
+  // chrono decided which day this is against its own default hour, so pulling
+  // the hour back to DEFAULT_HOUR can strand the reminder in the past — said
+  // at 1pm on a Saturday, "this Saturday" resolves to 9am that morning. The
+  // next occurrence is a week out for a weekday, a day for an implied one.
+  if (date.getTime() < now.getTime()) {
+    if (comp.isCertain('weekday')) date.setDate(date.getDate() + 7);
+    else if (!comp.isCertain('day')) date.setDate(date.getDate() + 1);
+  }
+  return date;
+}
+
+function isOffsetPhrase(transcript: string, match: ParsedResult): boolean {
+  return OFFSET_PHRASE.test(match.text) ||
+    OFFSET_SUFFIX.test(transcript.slice(match.index + match.text.length));
+}
+
+/**
+ * Strips what a spoken reminder wraps its details in: filler openings, the
+ * connector that introduces the details, and the punctuation and whitespace
+ * the removed time clause leaves behind. Mirrors extractDetails in
+ * SpokenReminderParser.kt — keep the two in sync.
+ */
+function cleanRemainder(raw: string): string {
+  let remainder = raw.replace(WHITESPACE_RUN, ' ').trim();
+  // A leading filler phrase can precede the time clause ("set a reminder in
+  // one hour for take out the trash"), so it may still be present after the
+  // time clause is stripped out from the middle — hence stripping twice.
+  for (let pass = 0; pass < 2; pass += 1) {
+    remainder = remainder.replace(LEADING_PUNCTUATION, '');
+    remainder = remainder.replace(FILLER_PREFIX, '').replace(REMIND_ME_PREFIX, '').trim();
+    // The tail of an offset chrono only partly consumed ("a week" out of "a
+    // week from today") is part of the time clause, not of the details.
+    remainder = remainder.replace(OFFSET_SUFFIX, '').trim();
+    remainder = remainder.replace(CONNECTOR_PREFIX, '').trim();
+  }
+  return remainder.replace(LEADING_PUNCTUATION, '').trim();
+}
+
 /** Exported for the parser smoke-check; not otherwise called directly. */
 export function parseSpokenReminder(transcript: string): VoiceCaptureResult {
   const clean = transcript.trim();
@@ -181,22 +287,13 @@ export function parseSpokenReminder(transcript: string): VoiceCaptureResult {
     remainder = clean;
   } else {
     const match_time = matches[0];
-    date_time = match_time.start.isCertain('meridiem') ?
-      match_time.start.date() :
-      resolveAmbiguousMeridiem(now, match_time.start);
+    date_time = resolveMatchedDateTime(now, clean, match_time);
     const before = clean.slice(0, match_time.index).replace(TRAILING_PREPOSITION, '').trimEnd();
     const after = clean.slice(match_time.index + match_time.text.length);
     remainder = `${before} ${after}`;
   }
-  remainder = remainder.replace(FILLER_PREFIX, '').replace(REMIND_ME_PREFIX, '').trim();
-  remainder = remainder.replace(CONNECTOR_PREFIX, '').trim();
-  // A leading filler phrase can precede the time clause ("set a reminder in
-  // one hour for..."), so it may still be present after the time clause is
-  // stripped out from the middle — strip it a second time.
-  remainder = remainder.replace(FILLER_PREFIX, '').replace(REMIND_ME_PREFIX, '').trim();
-  remainder = remainder.replace(CONNECTOR_PREFIX, '').trim();
 
-  const details = normalizeDetails(remainder);
+  const details = normalizeDetails(cleanRemainder(remainder));
   if (details === null) return { status: 'unparseable' };
 
   return {
