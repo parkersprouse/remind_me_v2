@@ -118,6 +118,15 @@ class ReminderListWidgetProvider : AppWidgetProvider() {
      * updatePeriodMillis is 0, which has a 30-minute floor and would only
      * wake the process to re-read a file that changes when the app says so.
      */
+    // notifyAppWidgetViewDataChanged is source-deprecated as of API 35, which
+    // deprecated RemoteViewsService-backed collections wholesale in favour of
+    // RemoteViews.setRemoteAdapter(viewId, RemoteCollectionItems). We can't
+    // take that: the replacement is API 31+ and minSdk is 26, so adopting it
+    // would mean carrying *both* paths (every factory gotcha above, plus a
+    // second branch) rather than replacing one — and RemoteCollectionItems
+    // ships every row inside the binder transaction, which an unbounded
+    // reminder list can outgrow. Revisit only if minSdk crosses 31.
+    @Suppress("DEPRECATION")
     fun refresh(context: Context) {
       val manager = AppWidgetManager.getInstance(context)
       val ids = manager.getAppWidgetIds(
