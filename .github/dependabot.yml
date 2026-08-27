@@ -1,0 +1,55 @@
+# Dependabot version updates. Security updates are a separate repo setting
+# (already enabled) and do not depend on this file.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR per ecosystem-ish cluster instead of one per package — this is a
+      # solo project and the review cost of ten separate lockfile PRs is real.
+      eslint:
+        patterns:
+          - '@eslint/*'
+          - '@stylistic/*'
+          - '@typescript-eslint/*'
+          - 'eslint'
+          - 'eslint-*'
+          - 'typescript-eslint'
+      tauri:
+        patterns:
+          - '@tauri-apps/*'
+      dev-minor-patch:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      cargo-minor-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Vendored at src-tauri/vendored/tauri-plugin-notification via
+      # [patch.crates-io] — upstream carries defects this tree fixes locally
+      # (see the notification gotchas in CLAUDE.md). Bumps must be a manual
+      # re-vendor, never an automated PR.
+      - dependency-name: tauri-plugin-notification
+
+  - package-ecosystem: gradle
+    directory: /src-tauri/gen/android
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    # NOTE: this tree is hand-edited (signing block, Java 17 compileOptions/
+    # kotlinOptions, manual receiver registrations). Review these PRs against
+    # the "Gradle files are hand-edited too" gotcha in CLAUDE.md and verify on
+    # a clean build before merging.

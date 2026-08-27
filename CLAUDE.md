@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Tauri v2 (Vue 3 + TypeScript + Pinia + Vite) rewrite of the Flutter app at `~/Code/GSS/remind-me`, migrated 1-1 in functionality and design. **The Flutter source is the behavior/design reference — preserve parity unless told otherwise.**
 
+## Git workflow
+
+**Commit directly on `main` unless told otherwise.** This is a solo project; don't branch, open a PR, or leave changes uncommitted in the working tree waiting for approval on ordinary work. Push is still a separate step — ask before pushing.
+
+Dependency bumps arrive as Dependabot PRs per `.github/dependabot.yml` (npm, cargo, gradle); those are the exception that does get reviewed on a branch, since Dependabot opens them. Security updates are a repo setting, already enabled, independent of that file.
+
 ## Commands
 
 ```sh
